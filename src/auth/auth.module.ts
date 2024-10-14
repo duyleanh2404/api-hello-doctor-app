@@ -1,9 +1,9 @@
 import * as path from "path";
 import { Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
+import { ConfigService } from "@nestjs/config";
 import { MongooseModule } from "@nestjs/mongoose";
 import { MailerModule } from "@nestjs-modules/mailer";
-import { ConfigModule, ConfigService } from "@nestjs/config";
 import { HandlebarsAdapter } from "@nestjs-modules/mailer/dist/adapters/handlebars.adapter";
 
 import { AuthService } from "./auth.service";
@@ -14,13 +14,14 @@ import { User, UserSchema } from "src/user/user.schema";
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
-    JwtModule.register({
-      secret: `${process.env.JWT_SECRET_KEY}`,
-      signOptions: { expiresIn: "1d" }
+    JwtModule.registerAsync({
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>("JWT_SECRET_KEY"),
+        signOptions: { expiresIn: "1d" }
+      }),
+      inject: [ConfigService]
     }),
-    ConfigModule.forRoot(),
     MailerModule.forRootAsync({
-      imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         transport: {
           host: configService.get("MAIL_HOST"),

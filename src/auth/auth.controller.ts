@@ -13,6 +13,7 @@ import { AuthService } from "./auth.service";
 import { LoginUserDto } from "./dto/login-user.dto";
 import { RegisterUserDto } from "./dto/register-user.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
+import { RegisterAdminDto } from "./dto/register-admin.dto";
 import { LoginOrRegisterWithGoogleDto } from "./dto/login-or-register-with-google.dto";
 
 @Controller("auth")
@@ -22,23 +23,28 @@ export class AuthController {
   @Post("register")
   async register(@Body() registerUserDto: RegisterUserDto) {
     await this.authService.register(registerUserDto);
-    return { message: "Registration successful!" };
+    return { message: "Registered successfully!" };
   }
 
-  @Post("login-or-register-with-google")
+  @Post("register-admin")
+  async registerAdmin(@Body() registerAdminDto: RegisterAdminDto) {
+    await this.authService.registerAdmin(registerAdminDto);
+    return { message: "Registered successfully!" };
+  }
+
+  @Post("google")
   async loginOrRegisterWithGoogle(
     @Body() loginOrRegisterWithGoogleDto: LoginOrRegisterWithGoogleDto,
     @Res() response: Response
   ): Promise<void> {
     const result = await this.authService.loginOrRegisterWithGoogle(loginOrRegisterWithGoogleDto);
-
-    const message = result.newUser ? "Registration successful!" : "Login successful!";
+    const message = result.newUser ? "Registered successfully!" : "Logged in successfully!";
 
     if (result.newUser) {
       response.status(HttpStatus.CREATED).json({
         message,
-        accessToken: result.accessToken,
-        newUser: result.newUser
+        newUser: result.newUser,
+        accessToken: result.accessToken
       });
     } else {
       response.status(HttpStatus.OK).json({
@@ -53,7 +59,7 @@ export class AuthController {
   async login(@Body() loginUserDto: LoginUserDto) {
     const { accessToken } = await this.authService.login(loginUserDto);
     return {
-      message: "Login successful!",
+      message: "Logged in successfully!",
       accessToken
     };
   }
@@ -71,7 +77,7 @@ export class AuthController {
   }
 
   @Post("reset-password")
-  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto): Promise<{ message: string }> {
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     await this.authService.resetPassword(resetPasswordDto);
     return { message: "Password reset successfully!" };
   }

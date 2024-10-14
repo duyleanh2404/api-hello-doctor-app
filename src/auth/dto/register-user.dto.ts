@@ -43,4 +43,4 @@ export class RegisterUserDto {
   @IsOptional()
   @IsString({ message: "Image must be a string if provided!" })
   image?: string;
-}
+};

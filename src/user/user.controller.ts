@@ -8,33 +8,40 @@ import {
   NotFoundException
 } from "@nestjs/common";
 
+import { User } from "./user.schema";
 import { UserService } from "./user.service";
-import { JwtAuthGuard } from "src/auth/jwt.guard";
+import { Roles } from "src/auth/passport/roles.decorator";
+import { RolesGuard } from "src/auth/passport/roles.guard";
+import { JwtAuthGuard } from "src/auth/passport/jwt-auth.guard";
 
 @Controller("user")
 export class UserController {
   constructor(@Inject(UserService) private readonly userService: UserService) { }
 
-  @UseGuards(JwtAuthGuard)
   @Get("/me")
-  async getCurrentUser(@Request() req) {
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin", "user")
+  async getCurrentUser(@Request() req): Promise<{ message: string; user: User }> {
     const user = await this.userService.findById(req.user.id);
     if (!user) {
       throw new NotFoundException("User not found");
     }
+
     return {
       message: "User retrieved successfully!",
       user
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get(":id")
-  async findById(@Param("id") id: string) {
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin", "user")
+  async findById(@Param("id") id: string): Promise<{ message: string; user: User }> {
     const user = await this.userService.findById(id);
     if (!user) {
       throw new NotFoundException("User not found");
     }
+
     return {
       message: "User retrieved successfully!",
       user
