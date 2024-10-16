@@ -3,8 +3,10 @@ import { InjectModel } from "@nestjs/mongoose";
 import { Injectable, ConflictException, NotFoundException } from "@nestjs/common";
 
 import { Specialty } from "./specialty.schema";
+
 import { normalizeString } from "utils/normalize-string";
 import { convertImageToBase64 } from "utils/convert-to-base64";
+
 import { UpdateSpecialtyDto } from "./dto/update-specialty.dto";
 import { GetAllSpecialtiesDto } from "./dto/get-all-specialties.dto";
 import { CreateNewSpecialtyDto } from "./dto/create-new-specialty.dto";
@@ -33,7 +35,7 @@ export class SpecialtyService {
     const specialty = new this.specialtyModel({
       ...createNewSpecialtyDto,
       image: convertImageToBase64(image),
-      normalizedName: normalizeString(createNewSpecialtyDto.name),
+      normalizedName: normalizeString(createNewSpecialtyDto.name)
     });
 
     return specialty.save();

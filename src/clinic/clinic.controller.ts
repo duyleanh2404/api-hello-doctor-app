@@ -16,12 +16,14 @@ import { FilesInterceptor } from "@nestjs/platform-express";
 
 import { Clinic } from "./clinic.schema";
 import { ClinicService } from "./clinic.service";
+
 import { Roles } from "src/auth/passport/roles.decorator";
-import { UpdateClinicDto } from "./dto/update-clinic.dto";
 import { RolesGuard } from "src/auth/passport/roles.guard";
+import { JwtAuthGuard } from "src/auth/passport/jwt-auth.guard";
+
+import { UpdateClinicDto } from "./dto/update-clinic.dto";
 import { GetAllClinicsDto } from "./dto/get-all-clinics.dto";
 import { CreateNewClinicDto } from "./dto/create-new-clinic.dto";
-import { JwtAuthGuard } from "src/auth/passport/jwt-auth.guard";
 
 @Controller("clinic")
 export class ClinicController {

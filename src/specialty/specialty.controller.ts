@@ -16,9 +16,11 @@ import { FileInterceptor } from "@nestjs/platform-express";
 
 import { Specialty } from "./specialty.schema";
 import { SpecialtyService } from "./specialty.service";
+
 import { Roles } from "src/auth/passport/roles.decorator";
 import { RolesGuard } from "src/auth/passport/roles.guard";
 import { JwtAuthGuard } from "src/auth/passport/jwt-auth.guard";
+
 import { UpdateSpecialtyDto } from "./dto/update-specialty.dto";
 import { GetAllSpecialtiesDto } from "./dto/get-all-specialties.dto";
 import { CreateNewSpecialtyDto } from "./dto/create-new-specialty.dto";
@@ -55,10 +57,6 @@ export class SpecialtyController {
     @UploadedFile() image: Express.Multer.File,
     @Body() updateSpecialtyDto: UpdateSpecialtyDto
   ): Promise<{ message: string; specialty: Specialty }> {
-    if (!image) {
-      throw new BadRequestException("Image file is required!");
-    }
-
     const updatedSpecialty = await this.specialtyService.updateSpecialty(id, updateSpecialtyDto, image);
     return {
       message: "Specialty updated successfully!",

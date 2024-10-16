@@ -13,6 +13,8 @@ import { MailerService } from "@nestjs-modules/mailer";
 
 import { User } from "src/user/user.schema";
 import { LoginUserDto } from "./dto/login-user.dto";
+import { extractProvince } from "utils/extract-province";
+import { normalizeString } from "utils/normalize-string";
 import { RegisterUserDto } from "./dto/register-user.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { RegisterAdminDto } from "./dto/register-admin.dto";
@@ -45,7 +47,9 @@ export class AuthService {
       otp,
       role: "user",
       isVerified: false,
-      password: hashedPassword
+      password: hashedPassword,
+      province: extractProvince(registerUserDto.address),
+      normalizedFullname: normalizeString(registerUserDto.fullname)
     });
 
     await newUser.save();
@@ -64,6 +68,7 @@ export class AuthService {
       password: hashedPassword
     });
 
+    admin.set("gender", undefined, { strict: false });
     admin.set("isVerified", undefined, { strict: false });
     await admin.save();
 
