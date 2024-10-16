@@ -3,10 +3,12 @@ import { InjectModel } from "@nestjs/mongoose";
 import { Injectable, ConflictException, NotFoundException } from "@nestjs/common";
 
 import { Clinic } from "./clinic.schema";
+
 import { normalizeString } from "utils/normalize-string";
+import { convertImageToBase64 } from "utils/convert-to-base64";
+
 import { UpdateClinicDto } from "./dto/update-clinic.dto";
 import { GetAllClinicsDto } from "./dto/get-all-clinics.dto";
-import { convertImageToBase64 } from "utils/convert-to-base64";
 import { CreateNewClinicDto } from "./dto/create-new-clinic.dto";
 
 @Injectable()

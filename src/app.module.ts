@@ -12,6 +12,7 @@ import { JwtStrategy } from "./auth/passport/jwt.strategy";
 import { RolesGuard } from "./auth/passport/roles.guard";
 import { JwtAuthGuard } from "./auth/passport/jwt-auth.guard";
 import { SpecialtyModule } from "./specialty/specialty.module";
+import { DoctorModule } from './doctor/doctor.module';
 
 @Module({
   imports: [
@@ -22,7 +23,8 @@ import { SpecialtyModule } from "./specialty/specialty.module";
     SpecialtyModule,
     ConfigModule.forRoot({ isGlobal: true }),
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
-    MongooseModule.forRoot("mongodb+srv://duyleanh2404:0918496273Duy@cluster0.hvx43.mongodb.net/")
+    MongooseModule.forRoot("mongodb+srv://duyleanh2404:0918496273Duy@cluster0.hvx43.mongodb.net/"),
+    DoctorModule
   ],
   controllers: [],
   providers: [UserService, JwtStrategy, RolesGuard, JwtAuthGuard]
