@@ -1,32 +1,30 @@
 import { Document } from "mongoose";
 import { Schema, SchemaFactory, Prop } from "@nestjs/mongoose";
 
-export type ClinicDocument = Clinic & Document;
-
-@Schema({ timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } })
-export class Clinic {
-  @Prop({ required: true, trim: true })
+@Schema({ timestamps: true })
+export class Clinic extends Document {
+  @Prop({ required: true })
   name: string;
 
-  @Prop({ required: true, trim: true, lowercase: true, index: true })
+  @Prop({ required: true, index: true })
   normalizedName: string;
 
-  @Prop({ required: true, trim: true })
+  @Prop({ required: true })
   address: string;
 
-  @Prop({ required: true, trim: true })
+  @Prop({ required: true })
   province: string;
 
-  @Prop({ required: true, trim: true })
+  @Prop({ required: true })
   desc: string;
 
-  @Prop({ required: true, trim: true })
+  @Prop({ required: true })
   avatarName: string;
 
   @Prop({ required: true })
   avatar: string;
 
-  @Prop({ required: true, trim: true })
+  @Prop({ required: true })
   bannerName: string;
 
   @Prop({ required: true })

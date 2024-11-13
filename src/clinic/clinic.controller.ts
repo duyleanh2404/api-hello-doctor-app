@@ -1,29 +1,19 @@
 import {
-  Put,
-  Get,
-  Post,
-  Body,
-  Param,
-  Query,
-  Delete,
-  UseGuards,
-  Controller,
-  UploadedFiles,
-  UseInterceptors,
-  BadRequestException
+  Put, Get, Post, Body, Param, Query, Delete,
+  UseGuards, Controller, UploadedFiles, UseInterceptors
 } from "@nestjs/common";
 import { FilesInterceptor } from "@nestjs/platform-express";
 
 import { Clinic } from "./clinic.schema";
 import { ClinicService } from "./clinic.service";
-
 import { Roles } from "src/auth/passport/roles.decorator";
+
 import { RolesGuard } from "src/auth/passport/roles.guard";
 import { JwtAuthGuard } from "src/auth/passport/jwt-auth.guard";
 
-import { UpdateClinicDto } from "./dto/update-clinic.dto";
+import { EditClinicDto } from "./dto/edit-clinic.dto";
+import { CreateClinicDto } from "./dto/create-clinic.dto";
 import { GetAllClinicsDto } from "./dto/get-all-clinics.dto";
-import { CreateNewClinicDto } from "./dto/create-new-clinic.dto";
 
 @Controller("clinic")
 export class ClinicController {
@@ -34,15 +24,10 @@ export class ClinicController {
   @Roles("admin")
   @UseInterceptors(FilesInterceptor("files"))
   async createClinic(
-    @Body() createNewClinicDto: CreateNewClinicDto,
-    @UploadedFiles() files: Express.Multer.File[]
+    @Body() dto: CreateClinicDto, @UploadedFiles() files: Express.Multer.File[]
   ): Promise<{ message: string; clinic: Clinic }> {
-    if (files.length < 2) {
-      throw new BadRequestException("Both avatar and banner files are required!");
-    }
-
     const [avatar, banner] = files;
-    const clinic = await this.clinicService.create(createNewClinicDto, avatar, banner);
+    const clinic = await this.clinicService.createClinic(dto, avatar, banner);
 
     return {
       message: "Clinic created successfully!",
@@ -53,16 +38,12 @@ export class ClinicController {
   @Put(":id")
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles("admin")
-  @UseInterceptors(FilesInterceptor("files", 2))
-  async updateClinic(
-    @Param("id") id: string,
-    @UploadedFiles() files: Express.Multer.File[],
-    @Body() updateClinicDto: UpdateClinicDto
+  @UseInterceptors(FilesInterceptor("files"))
+  async editClinic(
+    @Param("id") id: string, @Body() dto: EditClinicDto, @UploadedFiles() files: Express.Multer.File[]
   ): Promise<{ message: string; clinic: Clinic }> {
-    const avatar = files[0];
-    const banner = files[1];
-
-    const updatedClinic = await this.clinicService.updateClinic(id, updateClinicDto, avatar, banner);
+    const [avatar, banner] = files;
+    const updatedClinic = await this.clinicService.editClinic(id, dto, avatar, banner);
 
     return {
       message: "Clinic updated successfully!",
@@ -79,12 +60,11 @@ export class ClinicController {
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles("admin", "user")
-  async getAllClinics(@Query() getAllClinicsDto: GetAllClinicsDto): Promise<{
+  async getAllClinics(@Query() dto: GetAllClinicsDto): Promise<{
     message: string; total: number; clinics: Clinic[]
   }> {
-    const { clinics, total } = await this.clinicService.getAllClinics(getAllClinicsDto);
+    const { clinics, total } = await this.clinicService.getAllClinics(dto);
+
     return {
       message: "Clinics retrieved successfully!",
       total,
@@ -93,10 +73,9 @@ export class ClinicController {
   }
 
   @Get(":id")
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles("admin", "user")
   async getClinicById(@Param("id") id: string): Promise<{ message: string; clinic: Clinic }> {
     const clinic = await this.clinicService.getClinicById(id);
+
     return {
       message: "Clinic retrieved successfully!",
       clinic

@@ -9,7 +9,7 @@ import { Clinic, ClinicSchema } from "./clinic.schema";
   imports: [
     MongooseModule.forFeature([{ name: Clinic.name, schema: ClinicSchema }])
   ],
-  providers: [ClinicService],
-  controllers: [ClinicController]
+  controllers: [ClinicController],
+  providers: [ClinicService]
 })
 export class ClinicModule { };

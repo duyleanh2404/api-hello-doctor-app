@@ -1,51 +1,57 @@
 import { Document } from "mongoose";
 import { Schema, SchemaFactory, Prop } from "@nestjs/mongoose";
 
-export type UserDocument = User & Document;
+@Schema({ timestamps: true })
+export class User extends Document {
+  @Prop()
+  doctor_id: string;
 
-@Schema({ timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } })
-export class User {
-  @Prop({ unique: true, required: true, trim: true, lowercase: true })
+  @Prop({ unique: true, required: true })
   email: string;
 
-  @Prop({ required: true, enum: ["admin", "user", "doctor"], default: "user" })
-  role: string;
-
-  @Prop({ required: true, trim: true })
+  @Prop({ required: true })
   fullname: string;
 
-  @Prop({ trim: true, lowercase: true, index: true })
-  normalizedFullname?: string;
+  @Prop({ required: true, index: true })
+  normalizedFullname: string;
+
+  @Prop({ required: true })
+  role: string;
 
   @Prop()
-  isVerified?: boolean;
+  gender: string;
 
   @Prop()
-  password?: string;
-
-  @Prop({ trim: true })
-  address?: string;
-
-  @Prop({ trim: true })
-  province?: string;
-
-  @Prop({ match: /^[0-9]+$/, trim: true })
-  phoneNumber?: string;
+  address: string;
 
   @Prop()
-  dateOfBirth?: string;
-
-  @Prop({ enum: ["male", "female"], default: "male" })
-  gender?: string;
+  password: string;
 
   @Prop()
-  image?: string;
+  province: string;
 
   @Prop()
-  imageName?: string;
+  phoneNumber: string;
 
   @Prop()
-  otp?: string;
+  dateOfBirth: string;
+
+  @Prop()
+  image: string;
+
+  @Prop()
+  imageName: string;
+
+  @Prop()
+  otp: string;
+
+  @Prop()
+  otpExpires: Date;
+
+  @Prop()
+  isVerified: boolean;
 };
 
 export const UserSchema = SchemaFactory.createForClass(User);
+
+UserSchema.index({ normalizedName: 1 });

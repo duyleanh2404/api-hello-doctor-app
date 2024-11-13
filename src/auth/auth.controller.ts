@@ -1,84 +1,60 @@
-import {
-  Res,
-  Post,
-  Body,
-  Inject,
-  HttpCode,
-  HttpStatus,
-  Controller
-} from "@nestjs/common";
-import { Response } from "express";
+import { Post, Body, Query, Inject, Controller } from "@nestjs/common";
 
+import { User } from "src/user/user.schema";
 import { AuthService } from "./auth.service";
-import { LoginUserDto } from "./dto/login-user.dto";
-import { RegisterUserDto } from "./dto/register-user.dto";
+
+import { LoginDto } from "./dto/login.dto";
+import { RegisterDto } from "./dto/register.dto";
+import { VerifyOtpDto } from "./dto/verify-otp.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { RegisterAdminDto } from "./dto/register-admin.dto";
-import { LoginOrRegisterWithGoogleDto } from "./dto/login-or-register-with-google.dto";
+import { ContinueWithGoogleDto } from "./dto/continue-with-google.dto";
 
 @Controller("auth")
 export class AuthController {
   constructor(@Inject(AuthService) private readonly authService: AuthService) { }
 
+  @Post("login")
+  async login(@Body() dto: LoginDto): Promise<{ message: string; user: User, accessToken: string }> {
+    const { user, accessToken } = await this.authService.login(dto);
+    return { message: "Logged in successfully!", user, accessToken };
+  }
+
   @Post("register")
-  async register(@Body() registerUserDto: RegisterUserDto) {
-    await this.authService.register(registerUserDto);
+  async register(@Body() dto: RegisterDto): Promise<{ message: string }> {
+    await this.authService.register(dto);
     return { message: "Registered successfully!" };
   }
 
   @Post("register-admin")
-  async registerAdmin(@Body() registerAdminDto: RegisterAdminDto) {
-    await this.authService.registerAdmin(registerAdminDto);
-    return { message: "Registered successfully!" };
+  async registerAdmin(@Body() dto: RegisterAdminDto): Promise<{ message: string }> {
+    await this.authService.registerAdmin(dto);
+    return { message: "Admin registered successfully!" };
   }
 
   @Post("google")
-  async loginOrRegisterWithGoogle(
-    @Body() loginOrRegisterWithGoogleDto: LoginOrRegisterWithGoogleDto,
-    @Res() response: Response
-  ): Promise<void> {
-    const result = await this.authService.loginOrRegisterWithGoogle(loginOrRegisterWithGoogleDto);
-    const message = result.newUser ? "Registered successfully!" : "Logged in successfully!";
-
-    if (result.newUser) {
-      response.status(HttpStatus.CREATED).json({
-        message,
-        newUser: result.newUser,
-        accessToken: result.accessToken
-      });
-    } else {
-      response.status(HttpStatus.OK).json({
-        message,
-        accessToken: result.accessToken
-      });
-    }
-  }
-
-  @Post("login")
-  @HttpCode(200)
-  async login(@Body() loginUserDto: LoginUserDto) {
-    const { accessToken } = await this.authService.login(loginUserDto);
-    return {
-      message: "Logged in successfully!",
-      accessToken
-    };
-  }
-
-  @Post("verify-otp")
-  async verifyOtp(@Body("email") email: string, @Body("otp") otp: string) {
-    await this.authService.verifyOtp(email, otp);
-    return { message: "OTP verification successful!" }
-  }
-
-  @Post("resend-otp")
-  async resendOtp(@Body("email") email: string) {
-    await this.authService.resendOtp(email);
-    return { message: "A new OTP has been sent to your email address!" };
+  async continueWithGoogle(@Body() dto: ContinueWithGoogleDto): Promise<{
+    message: string, user: User, accessToken: string
+  }> {
+    const { user, accessToken } = await this.authService.continueWithGoogle(dto);
+    return { message: "Google authentication completed successfully!", user, accessToken };
   }
 
   @Post("reset-password")
-  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
-    await this.authService.resetPassword(resetPasswordDto);
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<{ message: string }> {
+    await this.authService.resetPassword(dto);
     return { message: "Password reset successfully!" };
+  }
+
+  @Post("resend-otp")
+  async resendOtp(@Query("email") email: string): Promise<{ message: string }> {
+    await this.authService.resendOtp(email);
+    return { message: "OTP resent successfully! Please check your email." };
+  }
+
+  @Post("verify-otp")
+  async verifyOtp(@Body() dto: VerifyOtpDto): Promise<{ message: string }> {
+    await this.authService.verifyOtp(dto);
+    return { message: "OTP verified successfully!" };
   }
 };
