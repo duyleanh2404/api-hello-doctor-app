@@ -7,77 +7,45 @@ import { Clinic } from "./clinic.schema";
 import { normalizeString } from "utils/normalize-string";
 import { convertImageToBase64 } from "utils/convert-to-base64";
 
-import { UpdateClinicDto } from "./dto/update-clinic.dto";
+import { EditClinicDto } from "./dto/edit-clinic.dto";
+import { CreateClinicDto } from "./dto/create-clinic.dto";
 import { GetAllClinicsDto } from "./dto/get-all-clinics.dto";
-import { CreateNewClinicDto } from "./dto/create-new-clinic.dto";
 
 @Injectable()
 export class ClinicService {
   constructor(@InjectModel(Clinic.name) private clinicModel: Model<Clinic>) { }
 
-  async create(
-    createNewClinicDto: CreateNewClinicDto,
-    avatar: Express.Multer.File,
-    banner: Express.Multer.File
+  async createClinic(
+    dto: CreateClinicDto, avatar: Express.Multer.File, banner: Express.Multer.File
   ): Promise<Clinic> {
-    const existingClinic = await this.clinicModel.findOne({ name: createNewClinicDto.name }).exec();
+    const existingClinic = await this.clinicModel.findOne({ name: dto.name }).exec();
     if (existingClinic) {
-      throw new ConflictException({
-        errorCode: "CLINIC_ALREADY_EXISTS",
-        message: "Clinic already exists!"
-      });
+      throw new ConflictException("Clinic already exists!");
     }
 
-    createNewClinicDto.avatar = convertImageToBase64(avatar);
-    createNewClinicDto.banner = convertImageToBase64(banner);
-    createNewClinicDto.normalizedName = normalizeString(createNewClinicDto.name);
+    const addressParts = dto.address.split(",").map((part) => part.trim());
 
-    const addressParts = createNewClinicDto.address.split(",").map((part) => part.trim());
-    createNewClinicDto.province = addressParts[addressParts.length - 1];
-
-    const clinic = new this.clinicModel(createNewClinicDto);
+    const clinic = new this.clinicModel({
+      ...dto,
+      normalizedName: normalizeString(dto.name),
+      province: addressParts[addressParts.length - 1],
+      avatar: convertImageToBase64(avatar),
+      banner: convertImageToBase64(banner)
+    });
 
     return await clinic.save();
   }
 
-  async updateClinic(
-    id: string,
-    updateClinicDto: UpdateClinicDto,
-    avatar?: Express.Multer.File,
-    banner?: Express.Multer.File
+  async editClinic(
+    id: string, dto: EditClinicDto, avatar?: Express.Multer.File, banner?: Express.Multer.File
   ): Promise<Clinic> {
-    const { name, desc, address } = updateClinicDto;
-
     const clinic = await this.clinicModel.findById(id).exec();
     if (!clinic) {
-      throw new NotFoundException({
-        errorCode: "CLINIC_NOT_FOUND",
-        message: "Clinic not found!"
-      });
+      throw new NotFoundException("Clinic not found!");
     }
 
-    if (name) {
-      const existingClinic = await this.clinicModel.findOne({
-        name,
-        _id: { $ne: id }
-      }).exec();
-
-      if (existingClinic) {
-        throw new ConflictException({
-          errorCode: "CLINIC_ALREADY_EXISTS",
-          message: "Clinic already exists!"
-        });
-      }
-
-      clinic.name = name;
-      clinic.normalizedName = normalizeString(name);
-    }
-
-    if (desc) {
-      clinic.desc = desc;
-    }
-    if (address) {
-      clinic.address = address;
+    if (dto.name) {
+      clinic.normalizedName = normalizeString(dto.name);
     }
     if (avatar) {
       clinic.avatar = convertImageToBase64(avatar);
@@ -86,38 +54,60 @@ export class ClinicService {
       clinic.banner = convertImageToBase64(banner);
     }
 
+    Object.entries(dto).forEach(([key, value]) => {
+      if (value && key !== "avatar" && key !== "banner") {
+        clinic[key] = value;
+      }
+    });
+
     return await clinic.save();
   }
 
-  async deleteClinic(id: string): Promise<{ message: string }> {
+  async deleteClinic(id: string) {
     const clinic = await this.clinicModel.findByIdAndDelete(id).exec();
     if (!clinic) {
       throw new NotFoundException("Clinic not found!");
     }
-
-    return { message: "Clinic deleted successfully!" };
   }
 
-  async getAllClinics(getAllClinicsDto: GetAllClinicsDto): Promise<{ clinics: Clinic[]; total: number }> {
-    const { page = 1, limit = 10, query = "", province } = getAllClinicsDto;
-
+  async getAllClinics({
+    page = 1, limit = 10, query, exclude, province = "all"
+  }: GetAllClinicsDto): Promise<{ clinics: Clinic[]; total: number }> {
     const skip = (page - 1) * limit;
-    const normalizedSearchTerm = normalizeString(query);
-
     const filter: any = {};
 
-    if (normalizedSearchTerm) {
-      filter.normalizedName = { $regex: new RegExp(normalizedSearchTerm, "i") };
+    if (query) {
+      filter.normalizedName = { $regex: new RegExp(normalizeString(query), "i") };
     }
 
-    if (province && province !== "all") {
-      filter.province = province;
+    Object.entries({ province }).forEach(([key, value]) => {
+      if (value && value !== "all") {
+        filter[key] = value;
+      }
+    });
+
+    let projection: Record<string, number> = {};
+    if (exclude) {
+      const excludeFields = exclude.split(",").map(field => field.trim());
+      const defaultFields = ["name", "address", "desc", "avatar", "banner"];
+
+      defaultFields.forEach((field) => {
+        if (!excludeFields.includes(field)) {
+          projection[field] = 1;
+        }
+      });
     }
 
-    const clinicsPromise = this.clinicModel.find(filter).skip(skip).limit(limit).exec();
-    const totalPromise = this.clinicModel.countDocuments(filter).exec();
-
-    const [clinics, total] = await Promise.all([clinicsPromise, totalPromise]);
+    const [clinics, total] = await Promise.all([
+      this.clinicModel
+        .find(filter)
+        .skip(skip)
+        .limit(limit)
+        .select(projection)
+        .sort({ createdAt: -1 })
+        .exec(),
+      this.clinicModel.countDocuments(filter).exec()
+    ]);
 
     return { clinics, total };
   }

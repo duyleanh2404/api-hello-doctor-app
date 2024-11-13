@@ -1,29 +1,19 @@
 import {
-  Put,
-  Get,
-  Post,
-  Body,
-  Param,
-  Query,
-  Delete,
-  UseGuards,
-  Controller,
-  UploadedFile,
-  UseInterceptors,
-  BadRequestException
+  Put, Get, Post, Body, Param, Query, Delete,
+  UseGuards, Controller, UploadedFile, UseInterceptors
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 
 import { Specialty } from "./specialty.schema";
 import { SpecialtyService } from "./specialty.service";
-
 import { Roles } from "src/auth/passport/roles.decorator";
+
 import { RolesGuard } from "src/auth/passport/roles.guard";
 import { JwtAuthGuard } from "src/auth/passport/jwt-auth.guard";
 
-import { UpdateSpecialtyDto } from "./dto/update-specialty.dto";
+import { EditSpecialtyDto } from "./dto/edit-specialty.dto";
+import { CreateSpecialtyDto } from "./dto/create-specialty.dto";
 import { GetAllSpecialtiesDto } from "./dto/get-all-specialties.dto";
-import { CreateNewSpecialtyDto } from "./dto/create-new-specialty.dto";
 
 @Controller("specialty")
 export class SpecialtyController {
@@ -34,14 +24,10 @@ export class SpecialtyController {
   @Roles("admin")
   @UseInterceptors(FileInterceptor("image"))
   async createSpecialty(
-    @Body() createNewSpecialtyDto: CreateNewSpecialtyDto,
-    @UploadedFile() image: Express.Multer.File
+    @Body() dto: CreateSpecialtyDto, @UploadedFile() image: Express.Multer.File
   ): Promise<{ message: string; specialty: Specialty }> {
-    if (!image) {
-      throw new BadRequestException("Image file is required!");
-    }
+    const specialty = await this.specialtyService.createSpecialty(dto, image);
 
-    const specialty = await this.specialtyService.create(createNewSpecialtyDto, image);
     return {
       message: "Specialty created successfully!",
       specialty
@@ -52,12 +38,11 @@ export class SpecialtyController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles("admin")
   @UseInterceptors(FileInterceptor("image"))
-  async updateSpecialty(
-    @Param("id") id: string,
-    @UploadedFile() image: Express.Multer.File,
-    @Body() updateSpecialtyDto: UpdateSpecialtyDto
+  async editSpecialty(
+    @Param("id") id: string, @Body() dto: EditSpecialtyDto, @UploadedFile() image: Express.Multer.File
   ): Promise<{ message: string; specialty: Specialty }> {
-    const updatedSpecialty = await this.specialtyService.updateSpecialty(id, updateSpecialtyDto, image);
+    const updatedSpecialty = await this.specialtyService.editSpecialty(id, dto, image);
+
     return {
       message: "Specialty updated successfully!",
       specialty: updatedSpecialty
@@ -73,12 +58,13 @@ export class SpecialtyController {
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles("admin", "user")
-  async getAllSpecialties(@Query() getAllSpecialtiesDto: GetAllSpecialtiesDto): Promise<{
-    message: string; total: number; specialties: Specialty[]
+  async getAllSpecialties(@Query() dto: GetAllSpecialtiesDto): Promise<{
+    message: string;
+    total: number;
+    specialties: Specialty[];
   }> {
-    const { specialties, total } = await this.specialtyService.getAllSpecialties(getAllSpecialtiesDto);
+    const { specialties, total } = await this.specialtyService.getAllSpecialties(dto);
+
     return {
       message: "Specialties retrieved successfully!",
       total,
@@ -87,10 +73,19 @@ export class SpecialtyController {
   }
 
   @Get(":id")
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles("admin", "user")
   async getSpecialtyById(@Param("id") id: string): Promise<{ message: string; specialty: Specialty }> {
     const specialty = await this.specialtyService.getSpecialtyById(id);
+
+    return {
+      message: "Specialty retrieved successfully!",
+      specialty
+    };
+  }
+
+  @Get("name/:name")
+  async getSpecialtyByName(@Param("name") name: string): Promise<{ message: string; specialty: Specialty }> {
+    const specialty = await this.specialtyService.getSpecialtyByName(name);
+
     return {
       message: "Specialty retrieved successfully!",
       specialty

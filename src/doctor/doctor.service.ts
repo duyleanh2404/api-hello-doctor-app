@@ -5,15 +5,13 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { Doctor } from "./doctor.schema";
 import { User } from "src/user/user.schema";
 
-import { UpdateDoctorDto } from "./dto/update-doctor.dto";
-import { GetAllDoctorsDto } from "./dto/get-all-doctors.dto";
-import { CreateNewDoctorDto } from "./dto/create-new-doctor.dto";
-
 import { hashPassword } from "utils/hash-password";
-import { generateEmail } from "utils/generate-email";
 import { normalizeString } from "utils/normalize-string";
-import { generatePassword } from "utils/generate-password";
 import { convertImageToBase64 } from "utils/convert-to-base64";
+
+import { EditDoctorDto } from "./dto/edit-doctor.dto";
+import { CreateDoctorDto } from "./dto/create-doctor.dto";
+import { GetAllDoctorsDto } from "./dto/get-all-doctors.dto";
 
 @Injectable()
 export class DoctorService {
@@ -22,141 +20,123 @@ export class DoctorService {
     @InjectModel(Doctor.name) private readonly doctorModel: Model<Doctor>
   ) { }
 
-  async createNewDoctor(
-    createNewDoctorDto: CreateNewDoctorDto,
-    image: Express.Multer.File
-  ): Promise<Doctor> {
+  async createDoctor(dto: CreateDoctorDto, image: Express.Multer.File): Promise<Doctor> {
     const newDoctor = new this.doctorModel({
-      ...createNewDoctorDto,
+      ...dto,
       image: convertImageToBase64(image),
-      medical_fee: Number(createNewDoctorDto.medical_fee),
-      normalizedFullname: normalizeString(createNewDoctorDto.fullname)
+      medicalFee: Number(dto.medicalFee),
+      normalizedFullname: normalizeString(dto.fullname),
     });
 
     const doctor = await newDoctor.save();
 
-    const email = generateEmail(doctor.fullname);
-    const password = generatePassword(doctor.fullname);
+    const normalizedFullname = normalizeString(dto.fullname);
+    const normalizedFullnameNoSpace = normalizedFullname.replace(/\s+/g, "");
+    const email = `${normalizedFullnameNoSpace}${Math.floor(1000 + Math.random() * 9000)}@gmail.com`;
+    const password = `${normalizedFullnameNoSpace}123A@`;
     const hashedPassword = await hashPassword(password);
 
     const newUser = new this.userModel({
+      doctor_id: doctor._id,
       email,
-      role: "doctor",
+      fullname: doctor.fullname,
       password: hashedPassword,
-      fullname: doctor.fullname
+      normalizedFullname,
+      image: convertImageToBase64(image),
+      role: "doctor",
+      isVerified: true
     });
 
-    newUser.set("isVerified", undefined, { strict: false });
     await newUser.save();
 
     return doctor;
   }
 
-  async updateDoctor(
-    id: string,
-    updateDoctorDto: UpdateDoctorDto,
-    image?: Express.Multer.File
+  async editDoctor(
+    id: string, dto: EditDoctorDto, image?: Express.Multer.File
   ): Promise<Doctor> {
     const doctor = await this.doctorModel.findById(id).exec();
-    if (!doctor) {
-      throw new NotFoundException({
-        errorCode: "DOCTOR_NOT_FOUND",
-        message: "Doctor not found!"
-      });
-    }
-
-    if (updateDoctorDto.fullname) {
-      doctor.fullname = updateDoctorDto.fullname;
-      doctor.normalizedFullname = normalizeString(updateDoctorDto.fullname);
-    }
-
-    if (updateDoctorDto.clinic_id) {
-      doctor.clinic_id = updateDoctorDto.clinic_id;
-    }
-
-    if (updateDoctorDto.specialty_id) {
-      doctor.specialty_id = updateDoctorDto.specialty_id;
-    }
-
-    if (updateDoctorDto.desc) {
-      doctor.desc = updateDoctorDto.desc;
-    }
-
-    if (updateDoctorDto.province) {
-      doctor.province = updateDoctorDto.province;
-    }
-
-    if (updateDoctorDto.medical_fee) {
-      doctor.medical_fee = updateDoctorDto.medical_fee;
-    }
-
-    if (updateDoctorDto.imageName) {
-      doctor.imageName = updateDoctorDto.imageName;
-    }
-
-    if (image) {
-      doctor.image = convertImageToBase64(image);
-    }
-
-    return doctor.save();
-  }
-
-  async deleteDoctor(id: string): Promise<{ message: string }> {
-    const doctor = await this.doctorModel.findByIdAndDelete(id).exec();
     if (!doctor) {
       throw new NotFoundException("Doctor not found!");
     }
 
-    return { message: "Doctor deleted successfully!" };
+    if (dto.fullname) {
+      doctor.normalizedFullname = normalizeString(dto.fullname);
+    }
+    if (image) {
+      doctor.image = convertImageToBase64(image);
+    }
+
+    Object.entries(dto).forEach(([key, value]) => {
+      if (value !== undefined && key != "image") {
+        doctor[key] = value;
+      }
+    });
+
+    return await doctor.save();
   }
 
-  async getAllDoctors({ page,
-    limit,
-    query,
-    clinic,
-    province,
-    specialty
+  async deleteDoctor(id: string) {
+    const doctor = await this.doctorModel.findByIdAndDelete(id).exec();
+    if (!doctor) {
+      throw new NotFoundException("Doctor not found!");
+    }
+  }
+
+  async getAllDoctors({
+    page, limit, clinic_id, specialty_id, exclude, query, province = "all"
   }: GetAllDoctorsDto): Promise<{
     doctors: Doctor[];
     total: number;
   }> {
     const skip = (page - 1) * limit;
-    const normalizedSearchTerm = normalizeString(query || "");
 
-    const filter: any = {};
+    const filter: Record<string, any> = {
+      ...(query && {
+        normalizedFullname: { $regex: new RegExp(normalizeString(query), "i") },
+      }),
+      ...(province && province !== "all" && { province }),
+      ...(clinic_id && clinic_id !== "all" && { clinic_id }),
+      ...(specialty_id && specialty_id !== "all" && { specialty_id })
+    };
 
-    if (normalizedSearchTerm) {
-      filter.normalizedFullname = { $regex: new RegExp(normalizedSearchTerm, "i") };
+    let projection: Record<string, number> = {};
+    let excludeFields: string[] = [];
+    if (exclude) {
+      excludeFields = exclude.split(",").map((field) => field.trim());
+      const defaultFields = ["desc", "image", "fullname"];
+
+      defaultFields.forEach((field) => {
+        if (!excludeFields.includes(field)) {
+          projection[field] = 1;
+        }
+      });
     }
 
-    if (province && province !== "all") {
-      filter.province = province;
+    const queryBuilder = this.doctorModel
+      .find(filter)
+      .skip(skip)
+      .limit(limit)
+      .select(projection)
+      .sort({ createdAt: -1 });
+
+    if (!excludeFields.includes("specialty_id")) {
+      queryBuilder.populate({
+        path: "specialty_id",
+        select: "-image -imageName -normalizedName -desc -createdAt -updatedAt -__v"
+      });
     }
 
-    if (clinic && clinic !== "all") {
-      filter.clinic_id = clinic;
-    }
-
-    if (specialty && specialty !== "all") {
-      filter.specialty_id = specialty;
+    if (!excludeFields.includes("clinic_id")) {
+      queryBuilder.populate({
+        path: "clinic_id",
+        select: "-avatar -avatarName -banner -bannerName -normalizedName -province -desc -createdAt -updatedAt -__v"
+      });
     }
 
     const [doctors, total] = await Promise.all([
-      this.doctorModel
-        .find(filter)
-        .skip(skip)
-        .limit(limit)
-        .select("-imageName")
-        .populate({
-          path: "specialty_id",
-          select: "-image -imageName -normalizedName -desc"
-        })
-        .populate({
-          path: "clinic_id",
-          select: "-avatar -avatarName -banner -bannerName -normalizedName -desc"
-        })
-        .exec(),
-      this.doctorModel.countDocuments(filter).exec(),
+      queryBuilder.exec(),
+      this.doctorModel.countDocuments(filter).exec()
     ]);
 
     return { doctors, total };
@@ -167,7 +147,7 @@ export class DoctorService {
       .findById(id)
       .populate({
         path: "specialty_id",
-        select: "-image -imageName -normalizedName -desc"
+        select: "-imageName -normalizedName -desc"
       })
       .populate({
         path: "clinic_id",

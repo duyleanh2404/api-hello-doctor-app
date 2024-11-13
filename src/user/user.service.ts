@@ -3,76 +3,48 @@ import { InjectModel } from "@nestjs/mongoose";
 import { Injectable, NotFoundException } from "@nestjs/common";
 
 import { User } from "./user.schema";
-import { GetAllUsersDto } from "./dto/get-all-users.dto";
+
 import { normalizeString } from "utils/normalize-string";
-import { UpdateUserDto } from "./dto/update-user.dto";
 import { convertImageToBase64 } from "utils/convert-to-base64";
+
+import { EditUserDto } from "./dto/edit-user.dto";
+import { GetAllUsersDto } from "./dto/get-all-users.dto";
 
 @Injectable()
 export class UserService {
   constructor(@InjectModel(User.name) private userModel: Model<User>) { }
 
-  async updateUser(
-    id: string,
-    updateUserDto: UpdateUserDto,
-    image?: Express.Multer.File
-  ): Promise<User> {
+  async editUser(id: string, dto: EditUserDto, image?: Express.Multer.File) {
     const user = await this.userModel.findById(id).exec();
     if (!user) {
       throw new NotFoundException("User not found!");
     }
 
-    if (updateUserDto.fullname) {
-      user.fullname = updateUserDto.fullname;
-      user.normalizedFullname = normalizeString(updateUserDto.fullname);
-    }
+    if (image) user.image = convertImageToBase64(image);
+    if (dto.fullname) user.normalizedFullname = normalizeString(dto.fullname);
 
-    if (updateUserDto.imageName) {
-      user.imageName = updateUserDto.imageName;
-    }
+    Object.entries(dto).forEach(([key, value]) => {
+      if (value) user[key] = value;
+    });
 
-    if (image) {
-      user.image = convertImageToBase64(image);
-    }
-
-    if (updateUserDto.gender) {
-      user.gender = updateUserDto.gender;
-    }
-
-    if (updateUserDto.phoneNumber) {
-      user.phoneNumber = updateUserDto.phoneNumber;
-    }
-
-    if (updateUserDto.address) {
-      user.address = updateUserDto.address;
-    }
-
-    if (updateUserDto.dateOfBirth) {
-      user.dateOfBirth = updateUserDto.dateOfBirth;
-    }
-
-    return user.save();
+    await user.save();
   }
 
-  async deleteUser(id: string): Promise<{ message: string }> {
+  async deleteUser(id: string) {
     const user = await this.userModel.findByIdAndDelete(id).exec();
     if (!user) {
       throw new NotFoundException("User not found!");
     }
-
-    return { message: "User deleted successfully!" };
   }
 
   async getAllUsers({ page, limit, query, province }: GetAllUsersDto): Promise<{
-    users: User[];
-    total: number;
+    users: User[]; total: number;
   }> {
     const skip = (page - 1) * limit;
-    const normalizedSearchTerm = normalizeString(query || "");
-
     const filter: any = { role: "user" };
 
-    if (normalizedSearchTerm) {
+    if (query) {
+      const normalizedSearchTerm = normalizeString(query);
       filter.normalizedFullname = { $regex: new RegExp(normalizedSearchTerm, "i") };
     }
 
@@ -81,8 +53,13 @@ export class UserService {
     }
 
     const [users, total] = await Promise.all([
-      this.userModel.find(filter).select("-password").skip(skip).limit(limit).exec(),
-      this.userModel.countDocuments(filter).exec(),
+      this.userModel
+        .find(filter)
+        .select("fullname dateOfBirth gender address phoneNumber")
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.userModel.countDocuments(filter).exec()
     ]);
 
     return { users, total };
@@ -93,6 +70,7 @@ export class UserService {
     if (!user) {
       throw new NotFoundException("User not found!");
     }
+
     return user;
   }
 };

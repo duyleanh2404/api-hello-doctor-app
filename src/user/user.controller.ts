@@ -1,27 +1,18 @@
 import {
-  Get,
-  Param,
-  Inject,
-  Request,
-  UseGuards,
-  Controller,
-  NotFoundException,
-  Query,
-  Put,
-  UseInterceptors,
-  UploadedFile,
-  Body,
-  Delete
+  Get, Put, Body, Query, Param, Delete, Inject, Request, UseGuards,
+  Controller, UploadedFile, UseInterceptors, NotFoundException
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 
 import { User } from "./user.schema";
 import { UserService } from "./user.service";
-import { GetAllUsersDto } from "./dto/get-all-users.dto";
 import { Roles } from "src/auth/passport/roles.decorator";
+
 import { RolesGuard } from "src/auth/passport/roles.guard";
 import { JwtAuthGuard } from "src/auth/passport/jwt-auth.guard";
-import { UpdateUserDto } from "./dto/update-user.dto";
+
+import { EditUserDto } from "./dto/edit-user.dto";
+import { GetAllUsersDto } from "./dto/get-all-users.dto";
 
 @Controller("user")
 export class UserController {
@@ -29,18 +20,13 @@ export class UserController {
 
   @Put(":id")
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles("admin")
+  @Roles("admin", "user", "doctor")
   @UseInterceptors(FileInterceptor("image"))
-  async updateUser(
-    @Param("id") id: string,
-    @UploadedFile() image: Express.Multer.File,
-    @Body() updateUserDto: UpdateUserDto
-  ): Promise<{ message: string; user: User }> {
-    const updatedUser = await this.userService.updateUser(id, updateUserDto, image);
-    return {
-      message: "User updated successfully!",
-      user: updatedUser
-    };
+  async editUser(
+    @Param("id") id: string, @Body() dto: EditUserDto, @UploadedFile() image: Express.Multer.File
+  ): Promise<{ message: string }> {
+    await this.userService.editUser(id, dto, image);
+    return { message: "User updated successfully!" };
   }
 
   @Delete(":id")
@@ -53,7 +39,7 @@ export class UserController {
 
   @Get("/me")
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles("admin", "user")
+  @Roles("admin", "user", "doctor")
   async getCurrentUser(@Request() req): Promise<{ message: string; user: User }> {
     const user = await this.userService.getById(req.user.id);
     if (!user) {
@@ -69,10 +55,11 @@ export class UserController {
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles("admin", "user")
-  async getAllUsers(@Query() getAllUsersDto: GetAllUsersDto): Promise<{
+  async getAllUsers(@Query() dto: GetAllUsersDto): Promise<{
     message: string; total: number; users: User[]
   }> {
-    const { users, total } = await this.userService.getAllUsers(getAllUsersDto);
+    const { users, total } = await this.userService.getAllUsers(dto);
+
     return {
       message: "Users retrieved successfully!",
       total,
@@ -82,11 +69,11 @@ export class UserController {
 
   @Get(":id")
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles("admin", "user")
+  @Roles("admin")
   async getById(@Param("id") id: string): Promise<{ message: string; user: User }> {
     const user = await this.userService.getById(id);
     if (!user) {
-      throw new NotFoundException("User not found");
+      throw new NotFoundException("User not found!");
     }
 
     return {

@@ -9,7 +9,7 @@ import { Specialty, SpecialtySchema } from "./specialty.schema";
   imports: [
     MongooseModule.forFeature([{ name: Specialty.name, schema: SpecialtySchema }])
   ],
-  providers: [SpecialtyService],
-  controllers: [SpecialtyController]
+  controllers: [SpecialtyController],
+  providers: [SpecialtyService]
 })
 export class SpecialtyModule { };

@@ -1,115 +1,99 @@
 import { Model } from "mongoose";
-import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
+import { Injectable, NotFoundException } from "@nestjs/common";
 
-import { Posts } from "./post.schema";
+import { Post } from "./post.schema";
+
 import { normalizeString } from "utils/normalize-string";
-import { CreatePostDto } from "./dto/create-new-post.dto";
 import { convertImageToBase64 } from "utils/convert-to-base64";
-import { GetAllPostsDto } from "./dto/get-all-posts";
-import { UpdatePostDto } from "./dto/update-post.dto";
+
+import { EditPostDto } from "./dto/edit-post.dto";
+import { GetAllPostsDto } from "./dto/get-all-posts.dto";
+import { CreatePostDto } from "./dto/create-new-post.dto";
 
 @Injectable()
 export class PostService {
-  constructor(@InjectModel(Posts.name) private postModel: Model<Posts>) { }
+  constructor(@InjectModel(Post.name) private postModel: Model<Post>) { }
 
-  async createPost(
-    createPostDto: CreatePostDto,
-    image: Express.Multer.File
-  ): Promise<Posts> {
+  async createPost(dto: CreatePostDto, image: Express.Multer.File): Promise<Post> {
     const createdPost = new this.postModel({
-      ...createPostDto,
+      ...dto,
       image: convertImageToBase64(image),
-      normalizedTitle: normalizeString(createPostDto.title)
+      normalizedTitle: normalizeString(dto.title)
     });
 
     return createdPost.save();
   }
 
-  async updatePost(
-    id: string,
-    updatePostDto: UpdatePostDto,
-    image?: Express.Multer.File
-  ): Promise<Posts> {
+  async editPost(
+    id: string, dto: EditPostDto, image?: Express.Multer.File
+  ): Promise<Post> {
     const post = await this.postModel.findById(id).exec();
-    if (!post) {
-      throw new NotFoundException({
-        errorCode: "POST_NOT_FOUND",
-        message: "Post not found!"
-      });
-    }
-
-    if (updatePostDto.title) {
-      post.title = updatePostDto.title;
-      post.normalizedTitle = normalizeString(updatePostDto.title);
-    }
-
-    if (updatePostDto.desc) {
-      post.desc = updatePostDto.desc;
-    }
-
-    if (updatePostDto.release_date) {
-      post.release_date = updatePostDto.release_date;
-    }
-
-    if (updatePostDto.doctor_id) {
-      post.doctor_id = updatePostDto.doctor_id;
-    }
-
-    if (updatePostDto.specialty_id) {
-      post.specialty_id = updatePostDto.specialty_id;
-    }
-
-    if (updatePostDto.imageName) {
-      post.imageName = updatePostDto.imageName;
-    }
-
-    if (image) {
-      post.image = convertImageToBase64(image);
-    }
-
-    return post.save();
-  }
-
-  async deletePost(id: string): Promise<{ message: string }> {
-    const post = await this.postModel.findByIdAndDelete(id).exec();
     if (!post) {
       throw new NotFoundException("Post not found!");
     }
 
-    return { message: "Post deleted successfully!" };
+    if (dto.title) {
+      post.normalizedTitle = normalizeString(dto.title);
+    }
+    if (image) {
+      post.image = convertImageToBase64(image);
+    }
+
+    Object.entries(dto).forEach(([key, value]) => {
+      if (value !== undefined && key != "image") {
+        post[key] = value;
+      }
+    });
+
+    return await post.save();
   }
 
-  async getAllPosts({ page, limit, query, specialty, doctor, release_date }: GetAllPostsDto): Promise<{
-    posts: Posts[];
-    total: number;
-  }> {
+  async deletePost(id: string) {
+    const post = await this.postModel.findByIdAndDelete(id).exec();
+    if (!post) {
+      throw new NotFoundException("Post not found!");
+    }
+  }
+
+  async getAllPosts({
+    page = 1, limit = 10, doctor_id, specialty_id, query, exclude, releaseDate
+  }: GetAllPostsDto): Promise<{ posts: Post[]; total: number }> {
     const skip = (page - 1) * limit;
-    const normalizedSearchTerm = normalizeString(query || "");
+    const filter: Record<string, any> = {};
 
-    const filter: any = {};
+    const conditions: Record<string, any> = {
+      specialty_id: specialty_id && specialty_id !== "all" ? specialty_id : undefined,
+      doctor_id: doctor_id && doctor_id !== "all" ? doctor_id : undefined,
+      normalizedTitle: query ? { $regex: new RegExp(normalizeString(query), "i") } : undefined,
+      releaseDate: releaseDate || undefined
+    };
 
-    if (normalizedSearchTerm) {
-      filter.title = { $regex: new RegExp(normalizedSearchTerm, "i") };
-    }
+    Object.entries(conditions).forEach(([key, value]) => {
+      if (value !== undefined) {
+        filter[key] = value;
+      }
+    });
 
-    if (specialty && specialty !== "all") {
-      filter.specialty_id = specialty;
-    }
+    let projection: Record<string, number> = {};
+    if (exclude) {
+      const excludeFields = exclude.split(",").map(field => field.trim());
+      const defaultFields = ["title", "desc", "releaseDate", "image"];
 
-    if (doctor && doctor !== "all") {
-      filter.doctor_id = doctor;
-    }
-
-    if (release_date) {
-      filter.release_date = release_date;
+      defaultFields.forEach(field => {
+        if (!excludeFields.includes(field)) {
+          projection[field] = 1;
+        }
+      });
     }
 
     const [posts, total] = await Promise.all([
       this.postModel
         .find(filter)
-        .populate("doctor_id", "fullname")
+        .populate("doctor_id", "fullname image")
         .populate("specialty_id", "name")
+        .select(projection)
+        .sort({ releaseDate: -1 })
         .skip(skip)
         .limit(limit)
         .exec(),
@@ -119,11 +103,11 @@ export class PostService {
     return { posts, total };
   }
 
-  async getPostById(id: string): Promise<Posts> {
+  async getPostById(id: string): Promise<Post> {
     const post = await this.postModel
       .findById(id)
       .populate("specialty_id", "name")
-      .populate("doctor_id", "fullname")
+      .populate("doctor_id", "fullname image")
       .exec();
 
     if (!post) {

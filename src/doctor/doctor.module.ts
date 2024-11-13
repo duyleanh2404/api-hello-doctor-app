@@ -3,6 +3,7 @@ import { MongooseModule } from "@nestjs/mongoose";
 
 import { DoctorService } from "./doctor.service";
 import { DoctorController } from "./doctor.controller";
+
 import { Doctor, DoctorSchema } from "./doctor.schema";
 import { User, UserSchema } from "src/user/user.schema";
 import { Clinic, ClinicSchema } from "src/clinic/clinic.schema";

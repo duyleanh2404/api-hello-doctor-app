@@ -1,10 +1,11 @@
 import * as bcrypt from "bcrypt";
+
 import {
   Injectable,
+  NotFoundException,
   ConflictException,
   BadRequestException,
-  UnauthorizedException,
-  NotFoundException
+  UnauthorizedException
 } from "@nestjs/common";
 import { Model } from "mongoose";
 import { JwtService } from "@nestjs/jwt";
@@ -12,13 +13,17 @@ import { InjectModel } from "@nestjs/mongoose";
 import { MailerService } from "@nestjs-modules/mailer";
 
 import { User } from "src/user/user.schema";
-import { LoginUserDto } from "./dto/login-user.dto";
+
+import { generateOtp } from "utils/generate-otp";
 import { extractProvince } from "utils/extract-province";
 import { normalizeString } from "utils/normalize-string";
-import { RegisterUserDto } from "./dto/register-user.dto";
+
+import { LoginDto } from "./dto/login.dto";
+import { RegisterDto } from "./dto/register.dto";
+import { VerifyOtpDto } from "./dto/verify-otp.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { RegisterAdminDto } from "./dto/register-admin.dto";
-import { LoginOrRegisterWithGoogleDto } from "./dto/login-or-register-with-google.dto";
+import { ContinueWithGoogleDto } from "./dto/continue-with-google.dto";
 
 @Injectable()
 export class AuthService {
@@ -28,194 +33,169 @@ export class AuthService {
     private mailerService: MailerService
   ) { }
 
-  async register(registerUserDto: RegisterUserDto): Promise<User> {
-    const { email, password } = registerUserDto;
-
-    const existingUser = await this.userModel.findOne({ email });
-    if (existingUser) {
-      throw new ConflictException({
-        errorCode: "EMAIL_ALREADY_EXISTS",
-        message: "This email is already registered!"
-      });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-    const newUser = new this.userModel({
-      ...registerUserDto,
-      otp,
-      role: "user",
-      isVerified: false,
-      password: hashedPassword,
-      province: extractProvince(registerUserDto.address),
-      normalizedFullname: normalizeString(registerUserDto.fullname)
-    });
-
-    await newUser.save();
-    await this.sendOtpEmail(newUser.email, otp);
-
-    return newUser;
-  }
-
-  async registerAdmin({ email, fullname, password }: RegisterAdminDto): Promise<any> {
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const admin = new this.userModel({
-      email,
-      fullname,
-      role: "admin",
-      password: hashedPassword
-    });
-
-    admin.set("gender", undefined, { strict: false });
-    admin.set("isVerified", undefined, { strict: false });
-    await admin.save();
-
-    return admin;
-  }
-
-  async loginOrRegisterWithGoogle({ email, name }: LoginOrRegisterWithGoogleDto): Promise<{
-    accessToken: string; newUser?: User
-  }> {
-    let user = await this.userModel.findOne({ email });
-    if (!user) {
-      const newUser = new this.userModel({
-        email,
-        role: "user",
-        fullname: name
-      });
-
-      const accessToken = this.jwtService.sign({
-        id: newUser._id,
-        role: newUser.role,
-        email: newUser.email,
-        name: newUser.fullname
-      });
-
-      newUser.set("isVerified", undefined, { strict: false });
-      await newUser.save();
-
-      return { accessToken, newUser };
-    }
-
-    const accessToken = this.jwtService.sign({
-      id: user._id,
-      role: user.role,
-      email: user.email,
-      name: user.fullname
-    });
-
-    return { accessToken };
-  }
-
-  async sendOtpEmail(email: string, otp: string) {
-    await this.mailerService.sendMail({
-      from: "Hello Bacsi <hellodoctor.app.healthcare@gmail.com>",
-      to: email,
-      subject: "Xác thực tài khoản của bạn",
-      template: "./confirmation",
-      context: { email, otp }
-    });
-  }
-
-  async verifyOtp(email: string, otp: string) {
-    const user = await this.userModel.findOne({ email });
-    if (!user) {
-      throw new BadRequestException({
-        errorCode: "INVALID_EMAIL",
-        message: "Invalid email!"
-      });
-    }
-
-    if (user.otp !== otp) {
-      throw new BadRequestException({
-        errorCode: "INVALID_OTP",
-        message: "Invalid OTP!"
-      });
-    }
-
-    user.isVerified = true;
-    user.set("otp", undefined, { strict: false });
-
-    await user.save();
-  }
-
-  async resendOtp(email: string) {
-    const user = await this.userModel.findOne({ email });
-    if (!user) {
-      throw new BadRequestException({
-        errorCode: "USER_NOT_FOUND",
-        message: "User does not exist!"
-      });
-    }
-
-    if (!user.password) {
-      throw new BadRequestException({
-        errorCode: "GOOGLE_LOGIN_REQUIRED",
-        message: "This email is registered with Google. Please log in with Google!"
-      });
-    }
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    user.otp = otp;
-
-    await user.save();
-    await this.sendOtpEmail(email, otp);
-  }
-
-  async login({ email, password }: LoginUserDto): Promise<{ accessToken: string }> {
-    const user = await this.userModel.findOne({ email });
-    if (!user) {
-      throw new NotFoundException({
-        errorCode: "USER_NOT_FOUND",
-        message: "User does not exist!"
-      });
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      throw new UnauthorizedException({
-        errorCode: "INVALID_PASSWORD",
-        message: "Incorrect password!"
-      });
-    }
-
-    if (!user.password) {
-      throw new UnauthorizedException({
-        errorCode: "GOOGLE_LOGIN_REQUIRED",
-        message: "This email is registered with Google. Please log in with Google!"
-      });
-    }
-
-    if (user.isVerified === false) {
-      throw new UnauthorizedException({
-        errorCode: "EMAIL_NOT_VERIFIED",
-        message: "Email is not verified. Please verify your email with the OTP sent!"
-      });
-    }
-
-    const accessToken = this.jwtService.sign({
-      id: user._id,
-      role: user.role,
-      email: user.email,
-      name: user.fullname
-    });
-
-    return { accessToken };
-  }
-
-  async resetPassword({ email, newPassword }: ResetPasswordDto): Promise<any> {
+  async login({ email, password }: LoginDto) {
     const user = await this.userModel.findOne({ email });
     if (!user) {
       throw new NotFoundException("User does not exist!");
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    if (!user.password) {
+      throw new ConflictException("This email is registered with Google!");
+    }
 
-    user.password = hashedPassword;
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      throw new BadRequestException("Incorrect password!");
+    }
+
+    if (!user.isVerified) {
+      throw new UnauthorizedException("Email is not verified!");
+    }
+
+    const payload = {
+      id: user._id,
+      email: user.email,
+      name: user.fullname,
+      role: user.role,
+      ...(user.doctor_id && { doctor_id: user.doctor_id })
+    };
+
+    const accessToken = this.jwtService.sign(payload);
+    return { user, accessToken };
+  }
+
+  async register(dto: RegisterDto): Promise<User> {
+    const existingUser = await this.userModel.findOne({ email: dto.email });
+    if (existingUser) {
+      throw new ConflictException("This email is already registered!");
+    }
+
+    const otp = generateOtp();
+    const otpExpires = new Date(Date.now() + 1 * 60 * 1000);
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+
+    const newUser = new this.userModel({
+      ...dto,
+      normalizedFullname: normalizeString(dto.fullname),
+      role: "user",
+      password: hashedPassword,
+      province: extractProvince(dto.address),
+      otp,
+      otpExpires,
+      isVerified: false
+    });
+
+    await newUser.save();
+    await this.sendOtp(newUser.email, otp);
+
+    return newUser;
+  }
+
+  async registerAdmin({ email, fullname, password }: RegisterAdminDto) {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = new this.userModel({
+      email,
+      fullname,
+      password: hashedPassword,
+      role: "admin",
+      isVerified: true
+    });
+
+    user.set("gender", undefined, { strict: false });
+    await user.save();
+
+    return user;
+  }
+
+  async continueWithGoogle({ email, name, image }: ContinueWithGoogleDto) {
+    let user = await this.userModel.findOne({ email });
+    if (!user) {
+      user = new this.userModel({
+        email,
+        fullname: name,
+        normalizedFullname: normalizeString(name),
+        role: "user",
+        image,
+        isVerified: true
+      });
+
+      user.set("gender", undefined, { strict: false });
+      await user.save();
+    }
+
+    const accessToken = this.jwtService.sign({
+      id: user._id,
+      email: user.email,
+      name: user.fullname,
+      role: user.role
+    });
+
+    return { user, accessToken };
+  }
+
+  async resetPassword({ email, newPassword }: ResetPasswordDto) {
+    const user = await this.userModel.findOne({ email });
+    if (!user) {
+      throw new NotFoundException("User does not exist!");
+    }
+
     user.set("otp", undefined, { strict: false });
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+  }
+
+  private clearOtp(user: User) {
+    user.set("otp", undefined, { strict: false });
+    user.set("otpExpires", undefined, { strict: false });
+  }
+
+  async verifyOtp({ email, otp }: VerifyOtpDto) {
+    const user = await this.userModel.findOne({ email });
+    if (!user) {
+      throw new BadRequestException("Invalid email!");
+    }
+
+    if (user.otp !== otp) {
+      throw new UnauthorizedException("Invalid OTP!");
+    }
+
+    if (new Date() > user.otpExpires) {
+      this.clearOtp(user);
+      throw new BadRequestException("The OTP has expired! Please request a new one!");
+    }
+
+    user.isVerified = true;
+    this.clearOtp(user);
+    await user.save();
+  }
+
+  async sendOtp(email: string, otp: string) {
+    await this.mailerService.sendMail({
+      to: email,
+      context: { email, otp },
+      template: "./confirmation",
+      subject: "Verify your account",
+      from: "Hello Bacsi <hellodoctor.app.healthcare@gmail.com>"
+    });
+  }
+
+  async resendOtp(email: string) {
+    const user = await this.userModel.findOne({ email });
+    if (!user) {
+      throw new NotFoundException("User does not exist!");
+    }
+
+    if (!user.password) {
+      throw new ConflictException("This email is registered with Google!");
+    }
+
+    const otp = generateOtp();
+    const otpExpires = new Date(Date.now() + 1 * 60 * 1000);
+
+    user.otp = otp;
+    user.otpExpires = otpExpires;
 
     await user.save();
+    await this.sendOtp(email, otp);
   }
 };

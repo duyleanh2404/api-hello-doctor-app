@@ -1,50 +1,64 @@
-import { Controller, Post, Body, UseInterceptors, UploadedFile, Query, Get, Delete, Param, NotFoundException, Put } from "@nestjs/common";
-
-import { Posts } from "./post.schema";
-import { PostService } from "./post.service";
-import { CreatePostDto } from "./dto/create-new-post.dto";
+import {
+  Get, Put, Post, Body, Param, Query, Delete, UseGuards,
+  Controller, UploadedFile, UseInterceptors, NotFoundException
+} from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { GetAllPostsDto } from "./dto/get-all-posts";
-import { UpdatePostDto } from "./dto/update-post.dto";
+
+import { PostService } from "./post.service";
+import { Post as _Post } from "./post.schema";
+
+import { EditPostDto } from "./dto/edit-post.dto";
+import { GetAllPostsDto } from "./dto/get-all-posts.dto";
+import { CreatePostDto } from "./dto/create-new-post.dto";
+
+import { Roles } from "src/auth/passport/roles.decorator";
+import { RolesGuard } from "src/auth/passport/roles.guard";
+import { JwtAuthGuard } from "src/auth/passport/jwt-auth.guard";
 
 @Controller("post")
 export class PostController {
   constructor(private readonly postService: PostService) { }
 
   @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin", "doctor")
   @UseInterceptors(FileInterceptor("image"))
-  async create(
-    @Body() createPostDto: CreatePostDto,
-    @UploadedFile() image: Express.Multer.File
-  ): Promise<Posts> {
-    return this.postService.createPost(createPostDto, image);
+  async createPost(
+    @Body() dto: CreatePostDto, @UploadedFile() image: Express.Multer.File
+  ): Promise<{ message: string }> {
+    await this.postService.createPost(dto, image);
+    return { message: "Post created successfully!" }
   }
 
   @Put(":id")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin", "doctor")
   @UseInterceptors(FileInterceptor("image"))
-  async updatePost(
-    @Param("id") id: string,
-    @UploadedFile() image: Express.Multer.File,
-    @Body() updatePostDto: UpdatePostDto
-  ): Promise<{ message: string; post: Posts }> {
-    const updatedPost = await this.postService.updatePost(id, updatePostDto, image);
+  async editPost(
+    @Param("id") id: string, @Body() dto: EditPostDto, @UploadedFile() image: Express.Multer.File
+  ): Promise<{ message: string; post: _Post }> {
+    const post = await this.postService.editPost(id, dto, image);
+
     return {
       message: "Post updated successfully!",
-      post: updatedPost
+      post
     };
   }
 
   @Delete(":id")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin", "doctor")
   async deletePost(@Param("id") id: string): Promise<{ message: string }> {
     await this.postService.deletePost(id);
     return { message: "Post deleted successfully!" };
   }
 
   @Get()
-  async getAllPosts(@Query() getAllPostsDto: GetAllPostsDto): Promise<{
-    message: string; total: number; posts: Posts[]
+  async getAllPosts(@Query() dto: GetAllPostsDto): Promise<{
+    message: string; total: number; posts: _Post[]
   }> {
-    const { posts, total } = await this.postService.getAllPosts(getAllPostsDto);
+    const { posts, total } = await this.postService.getAllPosts(dto);
+
     return {
       message: "Posts retrieved successfully!",
       total,
@@ -53,7 +67,7 @@ export class PostController {
   }
 
   @Get(":id")
-  async getPostById(@Param("id") id: string): Promise<{ message: string; post: Posts }> {
+  async getPostById(@Param("id") id: string): Promise<{ message: string; post: _Post }> {
     const post = await this.postService.getPostById(id);
     if (!post) {
       throw new NotFoundException("Post not found");

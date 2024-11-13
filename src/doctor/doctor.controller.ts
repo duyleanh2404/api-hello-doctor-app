@@ -1,40 +1,33 @@
 import {
-  Get,
-  Put,
-  Post,
-  Body,
-  Query,
-  Param,
-  Delete,
-  Controller,
-  UploadedFile,
-  UseInterceptors,
-  BadRequestException,
+  Get, Put, Post, Body, Query, Param, Delete,
+  UseGuards, Controller, UploadedFile, UseInterceptors
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 
 import { Doctor } from "./doctor.schema";
 import { DoctorService } from "./doctor.service";
+import { Roles } from "src/auth/passport/roles.decorator";
 
-import { UpdateDoctorDto } from "./dto/update-doctor.dto";
+import { RolesGuard } from "src/auth/passport/roles.guard";
+import { JwtAuthGuard } from "src/auth/passport/jwt-auth.guard";
+
+import { EditDoctorDto } from "./dto/edit-doctor.dto";
+import { CreateDoctorDto } from "./dto/create-doctor.dto";
 import { GetAllDoctorsDto } from "./dto/get-all-doctors.dto";
-import { CreateNewDoctorDto } from "./dto/create-new-doctor.dto";
 
 @Controller("doctor")
 export class DoctorController {
   constructor(private readonly doctorService: DoctorService) { }
 
   @Post("create")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin")
   @UseInterceptors(FileInterceptor("image"))
-  async createNewDoctor(
-    @Body() createNewDoctorDto: CreateNewDoctorDto,
-    @UploadedFile() image: Express.Multer.File
+  async createDoctor(
+    @Body() dto: CreateDoctorDto, @UploadedFile() image: Express.Multer.File
   ): Promise<{ message: string; doctor: Doctor }> {
-    if (!image) {
-      throw new BadRequestException("Image file is required!");
-    }
+    const doctor = await this.doctorService.createDoctor(dto, image);
 
-    const doctor = await this.doctorService.createNewDoctor(createNewDoctorDto, image);
     return {
       message: "Doctor created successfully!",
       doctor
@@ -42,32 +35,36 @@ export class DoctorController {
   }
 
   @Put(":id")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin")
   @UseInterceptors(FileInterceptor("image"))
-  async updateDoctor(
-    @Param("id") id: string,
-    @Body() updateDoctorDto: UpdateDoctorDto,
-    @UploadedFile() image: Express.Multer.File,
+  async editDoctor(
+    @Param("id") id: string, @Body() dto: EditDoctorDto, @UploadedFile() image: Express.Multer.File
   ): Promise<{ message: string; doctor: Doctor }> {
-    const updatedDoctor = await this.doctorService.updateDoctor(id, updateDoctorDto, image);
+    const doctor = await this.doctorService.editDoctor(id, dto, image);
+
     return {
       message: "Doctor updated successfully!",
-      doctor: updatedDoctor
+      doctor
     };
   }
 
   @Delete(":id")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin")
   async deleteDoctor(@Param("id") id: string): Promise<{ message: string }> {
     await this.doctorService.deleteDoctor(id);
     return { message: "Doctor deleted successfully!" };
   }
 
   @Get()
-  async getAllDoctors(@Query() getAllDoctorsDto: GetAllDoctorsDto): Promise<{
-    message: string; total: number; doctors: Doctor[]
+  async getAllDoctors(@Query() dto: GetAllDoctorsDto): Promise<{
+    message: string; total: number; doctors: Doctor[];
   }> {
-    const { doctors, total } = await this.doctorService.getAllDoctors(getAllDoctorsDto);
+    const { doctors, total } = await this.doctorService.getAllDoctors(dto);
+
     return {
-      message: "Doctor retrieved successfully!",
+      message: "Doctors retrieved successfully!",
       total,
       doctors
     };
@@ -76,6 +73,7 @@ export class DoctorController {
   @Get(":id")
   async getDoctorById(@Param("id") id: string): Promise<{ message: string; doctor: Doctor }> {
     const doctor = await this.doctorService.getDoctorById(id);
+
     return {
       message: "Doctor retrieved successfully!",
       doctor
