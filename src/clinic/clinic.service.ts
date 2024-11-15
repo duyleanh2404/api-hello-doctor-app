@@ -5,6 +5,7 @@ import { Injectable, ConflictException, NotFoundException } from "@nestjs/common
 import { Clinic } from "./clinic.schema";
 
 import { normalizeString } from "utils/normalize-string";
+import { createProjection } from "utils/create-projection";
 import { convertImageToBase64 } from "utils/convert-to-base64";
 
 import { EditClinicDto } from "./dto/edit-clinic.dto";
@@ -79,24 +80,12 @@ export class ClinicService {
     if (query) {
       filter.normalizedName = { $regex: new RegExp(normalizeString(query), "i") };
     }
-
-    Object.entries({ province }).forEach(([key, value]) => {
-      if (value && value !== "all") {
-        filter[key] = value;
-      }
-    });
-
-    let projection: Record<string, number> = {};
-    if (exclude) {
-      const excludeFields = exclude.split(",").map(field => field.trim());
-      const defaultFields = ["name", "address", "desc", "avatar", "banner"];
-
-      defaultFields.forEach((field) => {
-        if (!excludeFields.includes(field)) {
-          projection[field] = 1;
-        }
-      });
+    if (province !== "all") {
+      filter.province = province;
     }
+
+    const defaultFields = ["name", "address", "desc", "avatar", "banner"];
+    const projection = createProjection(defaultFields, exclude);
 
     const [clinics, total] = await Promise.all([
       this.clinicModel

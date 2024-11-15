@@ -3,11 +3,11 @@ import { IsString, IsOptional } from "class-validator";
 export class EditPostDto {
   @IsOptional()
   @IsString()
-  specialty_id: string;
+  doctor_id: string;
 
   @IsOptional()
   @IsString()
-  doctor_id: string;
+  specialty_id: string;
 
   @IsOptional()
   @IsString()

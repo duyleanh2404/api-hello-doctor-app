@@ -7,11 +7,15 @@ export class EditClinicDto {
 
   @IsOptional()
   @IsString()
-  desc: string;
+  address: string;
 
   @IsOptional()
   @IsString()
-  address: string;
+  province: string;
+
+  @IsOptional()
+  @IsString()
+  desc: string;
 
   @IsOptional()
   @IsString()

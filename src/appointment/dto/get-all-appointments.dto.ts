@@ -1,20 +1,12 @@
-import {
-  IsInt,
-  IsDate,
-  IsString,
-  IsOptional,
-  IsPositive
-} from "class-validator";
+import { IsInt, IsDate, IsString, IsOptional } from "class-validator";
 
 export class GetAllAppointmentsDto {
   @IsOptional()
   @IsInt()
-  @IsPositive()
   page: number = 1;
 
   @IsOptional()
   @IsInt()
-  @IsPositive()
   limit: number = 10;
 
   @IsOptional()

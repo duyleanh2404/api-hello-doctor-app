@@ -12,4 +12,5 @@ import { Clinic, ClinicSchema } from "./clinic.schema";
   controllers: [ClinicController],
   providers: [ClinicService]
 })
+
 export class ClinicModule { };

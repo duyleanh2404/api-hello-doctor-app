@@ -52,9 +52,7 @@ export class DoctorService {
     return doctor;
   }
 
-  async editDoctor(
-    id: string, dto: EditDoctorDto, image?: Express.Multer.File
-  ): Promise<Doctor> {
+  async editDoctor(id: string, dto: EditDoctorDto, image?: Express.Multer.File): Promise<Doctor> {
     const doctor = await this.doctorModel.findById(id).exec();
     if (!doctor) {
       throw new NotFoundException("Doctor not found!");
@@ -68,9 +66,7 @@ export class DoctorService {
     }
 
     Object.entries(dto).forEach(([key, value]) => {
-      if (value !== undefined && key != "image") {
-        doctor[key] = value;
-      }
+      if (key != "normalizedFullname" && key !== "image") doctor[key] = value;
     });
 
     return await doctor.save();
@@ -84,34 +80,28 @@ export class DoctorService {
   }
 
   async getAllDoctors({
-    page, limit, clinic_id, specialty_id, exclude, query, province = "all"
-  }: GetAllDoctorsDto): Promise<{
-    doctors: Doctor[];
-    total: number;
-  }> {
+    page, limit, clinic_id, specialty_id, query, exclude, province = "all"
+  }: GetAllDoctorsDto): Promise<{ doctors: Doctor[]; total: number; }> {
     const skip = (page - 1) * limit;
 
     const filter: Record<string, any> = {
-      ...(query && {
-        normalizedFullname: { $regex: new RegExp(normalizeString(query), "i") },
-      }),
-      ...(province && province !== "all" && { province }),
+      ...(query && { normalizedFullname: { $regex: new RegExp(normalizeString(query), "i") } }),
       ...(clinic_id && clinic_id !== "all" && { clinic_id }),
-      ...(specialty_id && specialty_id !== "all" && { specialty_id })
+      ...(specialty_id && specialty_id !== "all" && { specialty_id }),
+      ...(province && province !== "all" && { province })
     };
 
     let projection: Record<string, number> = {};
     let excludeFields: string[] = [];
+    const defaultFields = ["desc", "image", "fullname"];
+
     if (exclude) {
       excludeFields = exclude.split(",").map((field) => field.trim());
-      const defaultFields = ["desc", "image", "fullname"];
-
-      defaultFields.forEach((field) => {
-        if (!excludeFields.includes(field)) {
-          projection[field] = 1;
-        }
-      });
     }
+
+    defaultFields.forEach((field) => {
+      if (!excludeFields.includes(field)) projection[field] = 1;
+    });
 
     const queryBuilder = this.doctorModel
       .find(filter)

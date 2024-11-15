@@ -12,8 +12,8 @@ import { PaymentController } from "./payment.controller";
     VnpayModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        secureSecret: configService.getOrThrow<string>("VNPAY_SECURE_SECRET"),
         tmnCode: configService.getOrThrow<string>("VNPAY_TMN_CODE"),
+        secureSecret: configService.getOrThrow<string>("VNPAY_SECURE_SECRET"),
         loggerFn: ignoreLogger
       }),
       inject: [ConfigService]

@@ -23,4 +23,5 @@ import { Specialty, SpecialtySchema } from "src/specialty/specialty.schema";
   controllers: [AppointmentController],
   providers: [AppointmentService]
 })
+
 export class AppointmentModule { };

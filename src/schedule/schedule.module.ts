@@ -15,4 +15,5 @@ import { Doctor, DoctorSchema } from "src/doctor/doctor.schema";
   controllers: [ScheduleController],
   providers: [ScheduleService]
 })
+
 export class ScheduleModule { };

@@ -5,6 +5,7 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { Post } from "./post.schema";
 
 import { normalizeString } from "utils/normalize-string";
+import { createProjection } from "utils/create-projection";
 import { convertImageToBase64 } from "utils/convert-to-base64";
 
 import { EditPostDto } from "./dto/edit-post.dto";
@@ -25,9 +26,7 @@ export class PostService {
     return createdPost.save();
   }
 
-  async editPost(
-    id: string, dto: EditPostDto, image?: Express.Multer.File
-  ): Promise<Post> {
+  async editPost(id: string, dto: EditPostDto, image?: Express.Multer.File): Promise<Post> {
     const post = await this.postModel.findById(id).exec();
     if (!post) {
       throw new NotFoundException("Post not found!");
@@ -41,9 +40,7 @@ export class PostService {
     }
 
     Object.entries(dto).forEach(([key, value]) => {
-      if (value !== undefined && key != "image") {
-        post[key] = value;
-      }
+      if (key !== "normalizedTitle" && key != "image") post[key] = value;
     });
 
     return await post.save();
@@ -60,42 +57,26 @@ export class PostService {
     page = 1, limit = 10, doctor_id, specialty_id, query, exclude, releaseDate
   }: GetAllPostsDto): Promise<{ posts: Post[]; total: number }> {
     const skip = (page - 1) * limit;
-    const filter: Record<string, any> = {};
 
-    const conditions: Record<string, any> = {
-      specialty_id: specialty_id && specialty_id !== "all" ? specialty_id : undefined,
-      doctor_id: doctor_id && doctor_id !== "all" ? doctor_id : undefined,
-      normalizedTitle: query ? { $regex: new RegExp(normalizeString(query), "i") } : undefined,
-      releaseDate: releaseDate || undefined
+    const filter: Record<string, any> = {
+      ...(query && { normalizedTitle: { $regex: new RegExp(normalizeString(query), "i") } }),
+      ...(doctor_id && doctor_id !== "all" && { doctor_id }),
+      ...(specialty_id && specialty_id !== "all" && { specialty_id }),
+      ...(releaseDate && { releaseDate })
     };
 
-    Object.entries(conditions).forEach(([key, value]) => {
-      if (value !== undefined) {
-        filter[key] = value;
-      }
-    });
-
-    let projection: Record<string, number> = {};
-    if (exclude) {
-      const excludeFields = exclude.split(",").map(field => field.trim());
-      const defaultFields = ["title", "desc", "releaseDate", "image"];
-
-      defaultFields.forEach(field => {
-        if (!excludeFields.includes(field)) {
-          projection[field] = 1;
-        }
-      });
-    }
+    const defaultFields = ["title", "desc", "releaseDate", "image"];
+    const projection = createProjection(defaultFields, exclude);
 
     const [posts, total] = await Promise.all([
       this.postModel
         .find(filter)
+        .skip(skip)
+        .limit(limit)
         .populate("doctor_id", "fullname image")
         .populate("specialty_id", "name")
         .select(projection)
         .sort({ releaseDate: -1 })
-        .skip(skip)
-        .limit(limit)
         .exec(),
       this.postModel.countDocuments(filter).exec(),
     ]);

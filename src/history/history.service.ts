@@ -21,28 +21,22 @@ export class HistoryService {
 
   private mapHealthStatus(status: string): string {
     const statusMap: Record<string, string> = {
-      bad: "Xấu",
-      normal: "Bình Thường",
-      good: "Tốt"
+      bad: "Xấu", normal: "Bình Thường", good: "Tốt"
     };
     return statusMap[status] || "Bình Thường";
   }
 
   async createHistory(dto: CreateHistoryDto, prescriptionImage: Express.Multer.File): Promise<History> {
     const user = await this.userModel.findOne({ email: dto.email });
-
     if (!user) {
       throw new NotFoundException("User not found!");
     }
 
     const newHistory = new this.historyModel({
-      ...dto,
-      prescriptionImage: convertImageToBase64(prescriptionImage)
+      ...dto, prescriptionImage: convertImageToBase64(prescriptionImage)
     });
 
-    await this.appointmentModel.findByIdAndUpdate(dto.appointment_id, {
-      isFinished: true,
-    });
+    await this.appointmentModel.findByIdAndUpdate(dto.appointment_id, { isFinished: true });
 
     await this.mailerService.sendMail({
       from: "Hello Bacsi <hellodoctor.app.healthcare@gmail.com>",

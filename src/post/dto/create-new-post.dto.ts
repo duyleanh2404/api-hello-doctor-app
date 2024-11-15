@@ -3,11 +3,11 @@ import { IsString, IsNotEmpty } from "class-validator";
 export class CreatePostDto {
   @IsNotEmpty()
   @IsString()
-  specialty_id: string;
+  doctor_id: string;
 
   @IsNotEmpty()
   @IsString()
-  doctor_id: string;
+  specialty_id: string;
 
   @IsNotEmpty()
   @IsString()

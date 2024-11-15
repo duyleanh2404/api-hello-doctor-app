@@ -5,6 +5,7 @@ import { Injectable, ConflictException, NotFoundException } from "@nestjs/common
 import { Specialty } from "./specialty.schema";
 
 import { normalizeString } from "utils/normalize-string";
+import { createProjection } from "utils/create-projection";
 import { convertImageToBase64 } from "utils/convert-to-base64";
 
 import { EditSpecialtyDto } from "./dto/edit-specialty.dto";
@@ -31,9 +32,7 @@ export class SpecialtyService {
     return await specialty.save();
   }
 
-  async editSpecialty(
-    id: string, dto: EditSpecialtyDto, image?: Express.Multer.File
-  ): Promise<Specialty> {
+  async editSpecialty(id: string, dto: EditSpecialtyDto, image?: Express.Multer.File): Promise<Specialty> {
     const specialty = await this.specialtyModel.findById(id).exec();
     if (!specialty) {
       throw new NotFoundException("Specialty not found!");
@@ -47,9 +46,7 @@ export class SpecialtyService {
     }
 
     Object.entries(dto).forEach(([key, value]) => {
-      if (value !== undefined && key != "image") {
-        specialty[key] = value;
-      }
+      if (key != "normalizedFullname" && key !== "image") specialty[key] = value;
     });
 
     return await specialty.save();
@@ -70,22 +67,11 @@ export class SpecialtyService {
 
     if (query) {
       const normalizedSearchTerm = normalizeString(query);
-
-      filter = normalizedSearchTerm
-        ? { normalizedName: { $regex: new RegExp(normalizedSearchTerm, "i") } } : {};
+      filter = normalizedSearchTerm ? { normalizedName: { $regex: new RegExp(normalizedSearchTerm, "i") } } : {};
     }
 
-    let projection: Record<string, number> = {};
-    if (exclude) {
-      const excludeFields: string[] = exclude.split(",").map((field) => field.trim());
-      const defaultFields = ["name", "desc", "image"];
-
-      defaultFields.forEach((field) => {
-        if (!excludeFields.includes(field)) {
-          projection[field] = 1;
-        }
-      });
-    }
+    const defaultFields = ["name", "desc", "image"];
+    const projection = createProjection(defaultFields, exclude);
 
     const [specialties, total] = await Promise.all([
       this.specialtyModel

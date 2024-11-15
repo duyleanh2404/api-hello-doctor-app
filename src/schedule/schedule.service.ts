@@ -1,17 +1,13 @@
-import {
-  Injectable,
-  ConflictException,
-  NotFoundException
-} from "@nestjs/common";
 import { Model } from "mongoose";
 import { InjectModel } from "@nestjs/mongoose";
-
-import { toDate } from "date-fns-tz";
-
-import { normalizeString } from "utils/normalize-string";
+import { Injectable, ConflictException, NotFoundException } from "@nestjs/common";
 
 import { Schedule } from "./schedule.schema";
 import { Doctor } from "src/doctor/doctor.schema";
+
+import { convertToUTC } from "utils/convert-to-utc";
+import { normalizeString } from "utils/normalize-string";
+import { createProjection } from "utils/create-projection";
 
 import { GetScheduleDto } from "./dto/get-schedule.dto";
 import { EditScheduleDto } from "./dto/edit-schedule.dto";
@@ -28,18 +24,13 @@ export class ScheduleService {
 
   async createSchedule(dto: CreateScheduleDto): Promise<Schedule> {
     const { doctor_id, date } = dto;
-    const existingSchedule = await this.scheduleModel.findOne({ doctor_id, date }).exec();
-
-    const localDate = toDate(date, { timeZone: "Asia/Ho_Chi_Minh" });
-    const utcDate = new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000).toISOString();
+    const existingSchedule = await this.scheduleModel.findOne({ doctor_id, date: convertToUTC(date) }).exec();
 
     if (existingSchedule) {
       throw new ConflictException(`A schedule already exists for doctor with ID ${doctor_id} on ${date}!`);
     }
 
-    const newSchedule = new this.scheduleModel({
-      ...dto, date: utcDate
-    });
+    const newSchedule = new this.scheduleModel({ ...dto, date: convertToUTC(date) });
     return await newSchedule.save();
   }
 
@@ -71,26 +62,15 @@ export class ScheduleService {
         .find({ normalizedFullname: { $regex: new RegExp(normalizeString(query), "i") } })
         .select("_id");
 
-      if (doctorIds.length) {
-        filter.doctor_id = { $in: doctorIds.map(doc => doc._id) };
-      }
+      if (doctorIds.length) filter.doctor_id = { $in: doctorIds.map(doc => doc._id) };
     }
 
     if (date) {
-      filter.date = date;
+      filter.date = convertToUTC(date);
     }
 
-    let projection: Record<string, number> = {};
-    if (exclude) {
-      const excludeFields: string[] = exclude.split(",").map((field) => field.trim());
-      const defaultFields = ["date", "timeSlots"];
-
-      defaultFields.forEach((field) => {
-        if (!excludeFields.includes(field)) {
-          projection[field] = 1;
-        }
-      });
-    }
+    const defaultFields = ["date", "timeSlots"];
+    const projection = createProjection(defaultFields, exclude);
 
     const [schedules, total] = await Promise.all([
       this.scheduleModel
@@ -106,6 +86,7 @@ export class ScheduleService {
         .skip(skip)
         .limit(limit)
         .select(projection)
+        .sort({ date: -1 })
         .exec(),
       this.scheduleModel.countDocuments(filter).exec()
     ]);
@@ -113,11 +94,22 @@ export class ScheduleService {
     return { schedules, total };
   }
 
+  async getSchedulesByRange({ doctor_id, startDate, endDate }: GetScheduleRangeDto): Promise<Schedule[]> {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    const schedules = await this.scheduleModel.find({
+      doctor_id, date: { $gte: start, $lte: end }
+    }).exec();
+
+    return schedules;
+  }
+
   async getSchedule({ doctor_id, schedule_id, date }: GetScheduleDto): Promise<Schedule> {
     const filter = {
       ...(doctor_id && { doctor_id }),
       ...(schedule_id && { _id: schedule_id }),
-      ...(date && { date })
+      ...(date && { date: convertToUTC(date) })
     };
 
     const schedule = await this.scheduleModel
@@ -137,20 +129,5 @@ export class ScheduleService {
     }
 
     return schedule;
-  }
-
-  async getSchedulesByRange({ doctor_id, startDate, endDate }: GetScheduleRangeDto): Promise<Schedule[]> {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-
-    const schedules = await this.scheduleModel.find({
-      doctor_id,
-      date: {
-        $gte: start,
-        $lte: end
-      }
-    }).exec();
-
-    return schedules;
   }
 };

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Post, UseGuards } from "@nestjs/common";
 
 import { PaymentService } from "./payment.service";
 import { Roles } from "src/auth/passport/roles.decorator";
@@ -16,10 +16,6 @@ export class PaymentController {
   @Roles("user")
   async createPaymentUrl(@Body() dto: CreatePaymentDto): Promise<{ message: string; paymentUrl: string }> {
     const paymentUrl = this.paymentService.createPaymentUrl(dto);
-
-    return {
-      message: "Payment URL created successfully!",
-      paymentUrl
-    };
+    return { message: "Payment URL created successfully!", paymentUrl };
   }
 };

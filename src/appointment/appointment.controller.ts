@@ -19,21 +19,17 @@ export class AppointmentController {
 
   @Post("create")
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles("admin", "doctor", "user")
+  @Roles("user")
   async createAppointment(@Body() dto: CreateAppointmentDto): Promise<{
     message: string; appointment: Appointment;
   }> {
     const appointment = await this.appointmentService.createAppointment(dto);
-
-    return {
-      message: "Appointment created successfully!",
-      appointment
-    };
+    return { message: "Appointment created successfully!", appointment };
   }
 
   @Put(":token")
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles("admin", "doctor", "user")
+  @Roles("doctor", "user")
   async updateStatusAppointment(@Param("token") token: string) {
     await this.appointmentService.updateStatusAppointment(token);
     return { message: "Appointment status updated successfully" };
@@ -41,7 +37,7 @@ export class AppointmentController {
 
   @Delete(":id")
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles("admin", "doctor", "user")
+  @Roles("doctor", "user")
   async deleteAppointment(@Param("id") id: string): Promise<{ message: string }> {
     await this.appointmentService.deleteAppointment(id);
     return { message: "Appointment deleted successfully!" };
@@ -52,11 +48,6 @@ export class AppointmentController {
   @Roles("admin", "doctor", "user")
   async getAllAppointments(@Query() dto: GetAllAppointmentsDto) {
     const { appointments, total } = await this.appointmentService.getAllAppointments(dto);
-
-    return {
-      message: "Successfully retrieved appointments",
-      total,
-      appointments
-    };
+    return { message: "Successfully retrieved appointments", total, appointments };
   }
 };
