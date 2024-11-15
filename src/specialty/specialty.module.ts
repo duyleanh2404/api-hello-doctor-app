@@ -12,4 +12,5 @@ import { Specialty, SpecialtySchema } from "./specialty.schema";
   controllers: [SpecialtyController],
   providers: [SpecialtyService]
 })
+
 export class SpecialtyModule { };

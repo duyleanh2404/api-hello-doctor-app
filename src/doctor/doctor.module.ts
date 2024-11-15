@@ -19,4 +19,5 @@ import { Specialty, SpecialtySchema } from "src/specialty/specialty.schema";
   controllers: [DoctorController],
   providers: [DoctorService]
 })
+
 export class DoctorModule { };

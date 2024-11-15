@@ -1,10 +1,4 @@
-import {
-  IsString,
-  IsNumber,
-  IsBoolean,
-  IsOptional,
-  IsDateString
-} from "class-validator";
+import { IsString, IsNumber, IsOptional, IsDateString } from "class-validator";
 
 export class GetAllPostsDto {
   @IsOptional()
@@ -17,18 +11,18 @@ export class GetAllPostsDto {
 
   @IsOptional()
   @IsString()
-  specialty_id: string;
+  doctor_id: string;
 
   @IsOptional()
   @IsString()
-  doctor_id: string;
+  specialty_id: string;
 
   @IsOptional()
   @IsString()
   query: string;
 
   @IsOptional()
-  @IsBoolean()
+  @IsString()
   exclude: string;
 
   @IsOptional()

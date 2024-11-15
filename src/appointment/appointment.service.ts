@@ -18,6 +18,7 @@ import { Clinic } from "src/clinic/clinic.schema";
 import { Appointment } from "./appointment.schema";
 import { Schedule } from "src/schedule/schedule.schema";
 import { Specialty } from "src/specialty/specialty.schema";
+import { convertToUTC } from "utils/convert-to-utc";
 
 @Injectable()
 export class AppointmentService {
@@ -52,14 +53,18 @@ export class AppointmentService {
       throw new NotFoundException("Doctor not found!");
     }
 
-    const specialtyData = await this.specialtyModel.findById(doctorData.specialty_id);
     const clinicData = await this.clinicModel.findById(doctorData.clinic_id);
+    if (!clinicData) {
+      throw new NotFoundException("Clinic not found!");
+    }
+
+    const specialtyData = await this.specialtyModel.findById(doctorData.specialty_id);
+    if (!specialtyData) {
+      throw new NotFoundException("Specialty not found!");
+    }
 
     const appointmentInfo = { doctor_id, date, time };
     let newAppointment: any;
-
-    const localDate = toDate(date, { timeZone: "Asia/Ho_Chi_Minh" });
-    const utcDate = new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000).toISOString();
 
     switch (payment) {
       case "COD":
@@ -83,19 +88,19 @@ export class AppointmentService {
         });
 
         newAppointment = await this.appointmentModel.create({
-          user_id, doctor_id, date: utcDate, time, newPatients, zaloPhone,
+          user_id, doctor_id, date: convertToUTC(date), time, newPatients, zaloPhone,
           address, reasons, token, payment, isFinished: false, isVerified: false
         });
         break;
 
       case "ATM":
         newAppointment = await this.appointmentModel.create({
-          user_id, doctor_id, date: utcDate, time, newPatients,
+          user_id, doctor_id, date: convertToUTC(date), time, newPatients,
           zaloPhone, address, reasons, payment, isFinished: false, isVerified: true
         });
 
         await this.scheduleModel.findOneAndUpdate(
-          { doctor_id, date: utcDate, "timeSlots.timeline": time },
+          { doctor_id, date: convertToUTC(date), "timeSlots.timeline": time },
           { $set: { "timeSlots.$.isBooked": true } },
           { new: true }
         );
@@ -128,17 +133,12 @@ export class AppointmentService {
     }
 
     const decodedToken = Buffer.from(token, "base64").toString("utf8");
-    const appointmentData = JSON.parse(decodedToken);
-
-    const { doctor_id, date, time } = appointmentData;
-
-    const localDate = toDate(date, { timeZone: "Asia/Ho_Chi_Minh" });
-    const utcDate = new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000).toISOString();
+    const { doctor_id, date, time } = JSON.parse(decodedToken);
 
     await this.scheduleModel.findOneAndUpdate(
       {
         doctor_id,
-        date: utcDate,
+        date: convertToUTC(date),
         "timeSlots.timeline": time,
       },
       { $set: { "timeSlots.$.isBooked": true } },
@@ -157,10 +157,8 @@ export class AppointmentService {
     const filter: any = {};
 
     let userIds: string[] = [];
-
     if (query) {
       const normalizedSearchTerm = normalizeString(query);
-
       const users = await this.userModel
         .find({ normalizedFullname: { $regex: new RegExp(normalizedSearchTerm, "i") } })
         .select("_id")
@@ -179,48 +177,31 @@ export class AppointmentService {
     } else if (userIds.length) {
       filter.user_id = { $in: userIds };
     }
-
     if (doctor_id) {
       filter.doctor_id = doctor_id;
     }
-
     if (date) {
       filter.date = date;
     }
 
     const [appointments, total] = await Promise.all([
       this.appointmentModel
-        .find({
-          ...filter,
-          isFinished: false
-        })
+        .find({ ...filter, isFinished: false })
         .skip(skip)
         .limit(limit)
         .sort({ createdAt: -1 })
-        .populate({
-          path: "user_id",
-          select: "-image"
-        })
+        .populate({ path: "user_id", select: "-image" })
         .populate({
           path: "doctor_id",
           select: "-desc",
           populate: [
-            {
-              path: "clinic_id",
-              select: "avatar address name"
-            },
-            {
-              path: "specialty_id",
-              select: "name"
-            }
+            { path: "clinic_id", select: "avatar address name" },
+            { path: "specialty_id", select: "name" }
           ]
         })
         .exec(),
       this.appointmentModel
-        .countDocuments({
-          ...filter,
-          isFinished: false
-        })
+        .countDocuments({ ...filter, isFinished: false })
         .exec()
     ]);
 

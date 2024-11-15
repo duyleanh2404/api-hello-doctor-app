@@ -6,14 +6,14 @@ import { FileInterceptor } from "@nestjs/platform-express";
 
 import { PostService } from "./post.service";
 import { Post as _Post } from "./post.schema";
+import { Roles } from "src/auth/passport/roles.decorator";
+
+import { RolesGuard } from "src/auth/passport/roles.guard";
+import { JwtAuthGuard } from "src/auth/passport/jwt-auth.guard";
 
 import { EditPostDto } from "./dto/edit-post.dto";
 import { GetAllPostsDto } from "./dto/get-all-posts.dto";
 import { CreatePostDto } from "./dto/create-new-post.dto";
-
-import { Roles } from "src/auth/passport/roles.decorator";
-import { RolesGuard } from "src/auth/passport/roles.guard";
-import { JwtAuthGuard } from "src/auth/passport/jwt-auth.guard";
 
 @Controller("post")
 export class PostController {
@@ -38,11 +38,7 @@ export class PostController {
     @Param("id") id: string, @Body() dto: EditPostDto, @UploadedFile() image: Express.Multer.File
   ): Promise<{ message: string; post: _Post }> {
     const post = await this.postService.editPost(id, dto, image);
-
-    return {
-      message: "Post updated successfully!",
-      post
-    };
+    return { message: "Post updated successfully!", post };
   }
 
   @Delete(":id")
@@ -58,12 +54,7 @@ export class PostController {
     message: string; total: number; posts: _Post[]
   }> {
     const { posts, total } = await this.postService.getAllPosts(dto);
-
-    return {
-      message: "Posts retrieved successfully!",
-      total,
-      posts
-    };
+    return { message: "Posts retrieved successfully!", total, posts };
   }
 
   @Get(":id")
@@ -72,10 +63,6 @@ export class PostController {
     if (!post) {
       throw new NotFoundException("Post not found");
     }
-
-    return {
-      message: "Post retrieved successfully!",
-      post
-    };
+    return { message: "Post retrieved successfully!", post };
   }
 };

@@ -55,9 +55,9 @@ export class UserService {
     const [users, total] = await Promise.all([
       this.userModel
         .find(filter)
-        .select("fullname dateOfBirth gender address phoneNumber")
         .skip(skip)
         .limit(limit)
+        .select("fullname dateOfBirth gender address phoneNumber")
         .exec(),
       this.userModel.countDocuments(filter).exec()
     ]);

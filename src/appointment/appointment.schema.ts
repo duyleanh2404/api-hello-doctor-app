@@ -4,10 +4,10 @@ import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
 @Schema({ timestamps: true })
 export class Appointment extends Document {
   @Prop({ type: Types.ObjectId, ref: "User", required: true, index: true })
-  user_id: Types.ObjectId;
+  user_id: string;
 
   @Prop({ type: Types.ObjectId, ref: "Doctor", required: true, index: true })
-  doctor_id: Types.ObjectId;
+  doctor_id: string;
 
   @Prop({ required: true })
   date: Date;

@@ -1,9 +1,4 @@
-import {
-  IsDate,
-  IsString,
-  IsBoolean,
-  IsNotEmpty
-} from "class-validator";
+import { IsDate, IsString, IsBoolean, IsNotEmpty } from "class-validator";
 
 export class CreateAppointmentDto {
   @IsNotEmpty()
@@ -23,14 +18,6 @@ export class CreateAppointmentDto {
   time: string;
 
   @IsNotEmpty()
-  @IsBoolean()
-  newPatients: boolean;
-
-  @IsNotEmpty()
-  @IsString()
-  zaloPhone: string;
-
-  @IsNotEmpty()
   @IsString()
   address: string;
 
@@ -40,5 +27,13 @@ export class CreateAppointmentDto {
 
   @IsNotEmpty()
   @IsString()
+  zaloPhone: string;
+
+  @IsNotEmpty()
+  @IsString()
   payment: string;
+
+  @IsNotEmpty()
+  @IsBoolean()
+  newPatients: boolean;
 };

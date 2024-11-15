@@ -23,16 +23,12 @@ export class ClinicController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles("admin")
   @UseInterceptors(FilesInterceptor("files"))
-  async createClinic(
-    @Body() dto: CreateClinicDto, @UploadedFiles() files: Express.Multer.File[]
-  ): Promise<{ message: string; clinic: Clinic }> {
+  async createClinic(@Body() dto: CreateClinicDto, @UploadedFiles() files: Express.Multer.File[]): Promise<{
+    message: string; clinic: Clinic
+  }> {
     const [avatar, banner] = files;
     const clinic = await this.clinicService.createClinic(dto, avatar, banner);
-
-    return {
-      message: "Clinic created successfully!",
-      clinic
-    };
+    return { message: "Clinic created successfully!", clinic };
   }
 
   @Put(":id")
@@ -44,11 +40,7 @@ export class ClinicController {
   ): Promise<{ message: string; clinic: Clinic }> {
     const [avatar, banner] = files;
     const updatedClinic = await this.clinicService.editClinic(id, dto, avatar, banner);
-
-    return {
-      message: "Clinic updated successfully!",
-      clinic: updatedClinic
-    };
+    return { message: "Clinic updated successfully!", clinic: updatedClinic };
   }
 
   @Delete(":id")
@@ -64,21 +56,12 @@ export class ClinicController {
     message: string; total: number; clinics: Clinic[]
   }> {
     const { clinics, total } = await this.clinicService.getAllClinics(dto);
-
-    return {
-      message: "Clinics retrieved successfully!",
-      total,
-      clinics
-    };
+    return { message: "Clinics retrieved successfully!", total, clinics };
   }
 
   @Get(":id")
   async getClinicById(@Param("id") id: string): Promise<{ message: string; clinic: Clinic }> {
     const clinic = await this.clinicService.getClinicById(id);
-
-    return {
-      message: "Clinic retrieved successfully!",
-      clinic
-    };
+    return { message: "Clinic retrieved successfully!", clinic };
   }
 };
